@@ -189,9 +189,109 @@ print('PD test', len(pd.read_csv('plantdoc_test_mapped.csv')))"
 
 ---
 
-## 8. Next Milestones (Context)
+## 8. Milestone 2: CNN Baseline Training & Evaluation
 
-- **M2:** CNN baseline training on PV (train/val), evaluate on PV test + PD test
+M2 implements a CNN baseline using pre-trained models (MobileNetV3 and EfficientNetB0) to establish performance benchmarks on both in-domain (PlantVillage) and cross-domain (PlantDoc) test sets.
+
+### 8.1 Training a Model
+
+Train a CNN model on the PlantVillage training set:
+
+#### MobileNetV3
+```bash
+# Train MobileNetV3 Small (faster, ~13 mins)
+python src/train/train_cnn.py --model mobilenet_v3_small --epochs 10
+```
+
+#### EfficientNetB0
+```bash
+# Train EfficientNetB0 (slower, better performance, ~28 mins)
+python src/train/train_cnn.py --model efficientnet_b0 --epochs 10
+```
+
+**Optional arguments:**
+- `--batch-size`: Batch size (default: 32)
+- `--lr`: Learning rate (default: 0.001)
+- `--data-dir`: Root directory for images (default: `.`)
+- `--splits-dir`: Directory containing split CSVs (default: `data/splits`)
+- `--checkpoint-dir`: Where to save model checkpoints (default: `checkpoints`)
+- `--debug`: Run with truncated dataset for testing
+
+**Outputs:**
+- `checkpoints/cnn_baseline_<model>.pt`: Best model checkpoint (saved when validation accuracy improves)
+- `outputs/training_log_<model>.csv`: Training metrics per epoch (loss, accuracy, time)
+
+**Expected Results:**
+- MobileNetV3: ~99.11% validation accuracy
+- EfficientNetB0: ~99.28% validation accuracy
+
+### 8.2 Evaluating a Model
+
+Evaluate a trained model on both test sets (PlantVillage and PlantDoc):
+
+##### MobileNetV3
+```bash
+# Evaluate MobileNetV3
+python src/eval/evaluate_cnn.py \
+  --model-path checkpoints/cnn_baseline_mobilenet_v3_small.pt \
+  --model-name mobilenet_v3_small
+```
+
+#### EfficientNetB0
+```bash
+# Evaluate EfficientNetB0
+python src/eval/evaluate_cnn.py \
+  --model-path checkpoints/cnn_baseline_efficientnet_b0.pt \
+  --model-name efficientnet_b0
+```
+
+**Optional arguments:**
+- `--batch-size`: Batch size (default: 32)
+- `--data-dir`: Root directory for images (default: `.`)
+- `--splits-dir`: Directory containing split CSVs (default: `data/splits`)
+- `--output-file`: CSV file for results (default: `outputs/evaluation_results.csv`)
+
+**Outputs:**
+- `outputs/evaluation_results.csv`: Aggregate metrics (Accuracy, Precision, Recall, F1 scores)
+- `outputs/report_<model>_<testset>.txt`: Per-class classification reports
+
+**Expected Results:**
+
+| Model | PV Test (In-Domain) | PlantDoc Test (Cross-Domain) |
+|:---|:---|:---|
+| **MobileNetV3** | Acc: 98.64%, F1 (Weighted): 0.9864 | Acc: 20.09%, F1 (Weighted): 0.1662 |
+| **EfficientNetB0** | Acc: 99.20%, F1 (Weighted): 0.9920 | Acc: 21.00%, F1 (Weighted): 0.1974 |
+
+> **Note:** The severe performance drop on PlantDoc (~98-99% -> ~20-21%) confirms a significant domain gap.
+
+### 8.3 Visualizing Training Progress
+
+Generate plots for loss and accuracy from the training logs:
+
+```bash
+python src/utils/plot_training_cnn.py --log-file outputs/training_log_mobilenet_v3_small.csv
+```
+
+**Outputs:**
+- `outputs/plots/training_metrics.png`: Combined loss and accuracy curves
+
+### 8.4 Understanding the Results
+
+**Per-Class Reports:**
+The evaluation script generates detailed per-class metrics in `outputs/report_*.txt`. These reports show:
+- Which disease classes transfer well across domains
+- Which classes fail completely (0.00 F1-score)
+- Class-specific precision, recall, and support
+
+**Domain Gap Analysis:**
+Classes (10 for MobileNet and 9 for EfficientNetB0) with 0.00 scores on PlantDoc indicate severe domain shift. This is expected because:
+- PlantVillage: Controlled lab conditions, clean backgrounds, centered leaves
+- PlantDoc: Natural field conditions, cluttered backgrounds, variable lighting
+
+---
+
+## 9. Next Milestones (Context)
+
 - **M3:** ViT training + evaluation
 - **M4:** Robustness improvements (ROI and/or augmentations) + ablations
 - **M5:** Reliability layer (calibration + abstain option)
