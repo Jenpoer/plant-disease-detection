@@ -1,0 +1,282 @@
+"""
+CNN Baseline Training Script
+
+This module trains CNN models (MobileNetV3 or EfficientNetB0) for plant disease classification.
+It handles the complete training pipeline including:
+- Data loading from M1 split CSVs
+- Model initialization with pre-trained weights
+- Training loop with validation
+- Checkpoint saving (best model based on validation accuracy)
+- Training metrics logging to CSV
+
+Usage:
+    python src/train/train_cnn.py --model mobilenet_v3_small --epochs 10
+    python src/train/train_cnn.py --model efficientnet_b0 --epochs 10 --batch-size 64
+"""
+
+import argparse
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import pandas as pd
+import time
+import sys
+import ssl
+from pathlib import Path
+import platform
+from tqdm import tqdm
+
+# Add project root to path BEFORE importing local modules
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
+# Import helpers for data and model loading
+from src.utils.loader_cnn import get_dataloaders
+from src.utils.baseline_models_cnn import get_model
+
+# Only runs if on MacOS (Darwin is the OS kernel name for MacOS)
+# Disable SSL verification to fix for MacOS SSL error when downloading models
+if platform.system() == "Darwin":
+    ssl._create_default_https_context = ssl._create_unverified_context
+
+
+def train_one_epoch(model, loader, criterion, optimizer, device):
+    """
+    Executes one complete training epoch over the entire training dataset.
+
+    This function:
+    - Sets the model to training mode (enables dropout, batch norm updates)
+    - Iterates through all batches in the training loader
+    - Performs forward pass, loss calculation, backpropagation, and parameter updates
+    - Displays real-time progress with tqdm showing loss and accuracy
+
+    Args:
+        model: PyTorch model to train
+        loader: DataLoader containing training data
+        criterion: Loss function (e.g., CrossEntropyLoss)
+        optimizer: Optimizer for parameter updates (e.g., Adam)
+        device: Device to run computations on (cpu/cuda/mps)
+
+    Returns:
+        Tuple of (epoch_loss, epoch_acc) - average loss and accuracy for the epoch
+    """
+    model.train()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+
+    pbar = tqdm(loader, desc="Training", leave=False)
+    for images, labels in pbar:
+        images, labels = images.to(device), labels.to(device)
+
+        # Clear old gradients
+        optimizer.zero_grad()
+
+        # Forward pass (predictions)
+        outputs = model(images)
+
+        # Compute loss
+        loss = criterion(outputs, labels)
+
+        # Backward pass (calculate gradients) and optimize
+        loss.backward()
+        optimizer.step()
+
+        # Update running loss
+        running_loss += loss.item() * images.size(0)
+
+        # Get predictions and update total
+        _, predicted = outputs.max(1)
+        total += labels.size(0)
+
+        # Count how many predictions are correct
+        correct += predicted.eq(labels).sum().item()
+
+        # Update progress bar
+        pbar.set_postfix(loss=loss.item(), acc=correct / total)
+
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+    return epoch_loss, epoch_acc
+
+
+def validate(model, loader, criterion, device):
+    """
+    Evaluates the model on the validation dataset.
+
+    This function:
+    - Sets the model to evaluation mode (disables dropout, freezes batch norm)
+    - Disables gradient computation for efficiency (torch.no_grad)
+    - Computes predictions and metrics without updating model parameters
+    - Displays progress with tqdm
+
+    Args:
+        model: PyTorch model to evaluate
+        loader: DataLoader containing validation data
+        criterion: Loss function for computing validation loss
+        device: Device to run computations on (cpu/cuda/mps)
+
+    Returns:
+        Tuple of (epoch_loss, epoch_acc) - average loss and accuracy on validation set
+    """
+    # Set model to evaluation mode, freeze gradients and disable dropout
+    model.eval()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+
+    # Disable gradient calculation
+    with torch.no_grad():
+        pbar = tqdm(loader, desc="Validating", leave=False)
+        for images, labels in pbar:
+            images, labels = images.to(device), labels.to(device)
+
+            # Forward pass (predictions)
+            outputs = model(images)
+
+            # Compute loss
+            loss = criterion(outputs, labels)
+
+            # Update running loss
+            running_loss += loss.item() * images.size(0)
+
+            # Get predictions and update total
+            _, predicted = outputs.max(1)
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
+
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+    return epoch_loss, epoch_acc
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Train CNN Baseline")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="mobilenet_v3_small",
+        choices=["mobilenet_v3_small", "efficientnet_b0"],
+    )
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=0.001)
+    parser.add_argument("--data-dir", type=str, default=".")
+    parser.add_argument("--splits-dir", type=str, default="data/splits")
+    parser.add_argument("--output-dir", type=str, default="outputs")
+    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints")
+    parser.add_argument("--debug", action="store_true", help="Run with small subset")
+
+    args = parser.parse_args()
+
+    # Setup directories
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    Path(args.checkpoint_dir).mkdir(parents=True, exist_ok=True)
+
+    # Device switching to utilize mps/gpu if available, otherwise use CPU
+    device = torch.device(
+        "mps"
+        if torch.backends.mps.is_available()
+        else "cuda" if torch.cuda.is_available() else "cpu"
+    )
+    print(f"Using device: {device}")
+
+    # Data Paths
+    train_csv = Path(args.splits_dir) / "pv_train.csv"
+    val_csv = Path(args.splits_dir) / "pv_val.csv"
+
+    # Check if split partitions exist
+    if not train_csv.exists() or not val_csv.exists():
+        print(f"Error: Split partitions not found in {args.splits_dir}")
+        print("Please run M1 pipeline first.")
+        return
+
+    # Load Data
+    print(f"Loading data from {args.splits_dir}...")
+    train_loader, val_loader = get_dataloaders(
+        train_csv, val_csv, root_dir=args.data_dir, batch_size=args.batch_size
+    )
+
+    # Debug mode: truncate datasets
+    if args.debug:
+        print("DEBUG MODE: Truncating datasets")
+        train_loader.dataset.data = train_loader.dataset.data.head(100)
+        val_loader.dataset.data = val_loader.dataset.data.head(20)
+
+    # Model
+    print(f"Initializing {args.model}...")
+    model = get_model(args.model, num_classes=26)
+    model.to(device)
+
+    # Optimization
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+
+    # Training Loop
+    best_val_acc = 0.0
+    history = []
+
+    # Start timer
+    start_time = time.time()
+
+    # Training Loop
+    for epoch in range(args.epochs):
+        ep_start = time.time()
+
+        # Train for one epoch
+        train_loss, train_acc = train_one_epoch(
+            model, train_loader, criterion, optimizer, device
+        )
+
+        # Validate for one epoch
+        val_loss, val_acc = validate(model, val_loader, criterion, device)
+
+        # Print epoch results
+        dt = time.time() - ep_start
+        print(
+            f"Epoch {epoch+1}/{args.epochs} [{dt:.1f}s] "
+            f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} | "
+            f"Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}"
+        )
+
+        # Append to history
+        history.append(
+            {
+                "epoch": epoch + 1,
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "val_loss": val_loss,
+                "val_acc": val_acc,
+                "time": dt,
+            }
+        )
+
+        # Save best model to checkpoint
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            ckpt_path = Path(args.checkpoint_dir) / f"cnn_baseline_{args.model}.pt"
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "val_acc": val_acc,
+                    "config": vars(args),
+                },
+                ckpt_path,
+            )
+            print(f"  --> Saved new best model (Acc: {best_val_acc:.4f})")
+
+    # Print total training time
+    total_time = time.time() - start_time
+    print(
+        f"\nTraining complete in {total_time/60:.2f}m. Best Val Acc: {best_val_acc:.4f}"
+    )
+
+    # Save logs
+    log_path = Path(args.output_dir) / f"training_log_{args.model}.csv"
+    pd.DataFrame(history).to_csv(log_path, index=False)
+    print(f"Logs saved to {log_path}")
+
+
+if __name__ == "__main__":
+    main()
