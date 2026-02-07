@@ -30,8 +30,8 @@ import json
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Import helpers for data and model loading
-from utils.dataloaders import get_train_dataloader, get_val_dataloader
-from utils.baseline_models import get_model
+from src.utils.dataloaders import get_train_dataloader, get_val_dataloader
+from src.utils.baseline_models import get_model
 from src.utils.transformations import get_default_transforms
 
 # Only runs if on MacOS (Darwin is the OS kernel name for MacOS)
