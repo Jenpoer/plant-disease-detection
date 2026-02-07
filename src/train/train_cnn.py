@@ -30,8 +30,9 @@ from tqdm import tqdm
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Import helpers for data and model loading
-from src.utils.loader_cnn import get_dataloaders
+from src.utils.loader_cnn import get_train_dataloader, get_val_dataloader
 from src.utils.baseline_models_cnn import get_model
+from src.utils.transformations import get_default_transforms
 
 # Only runs if on MacOS (Darwin is the OS kernel name for MacOS)
 # Disable SSL verification to fix for MacOS SSL error when downloading models
@@ -150,12 +151,12 @@ def validate(model, loader, criterion, device):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train CNN Baseline")
+    parser = argparse.ArgumentParser(description="Train Models for Plant Disease Classification")
     parser.add_argument(
         "--model",
         type=str,
         default="mobilenet_v3_small",
-        choices=["mobilenet_v3_small", "efficientnet_b0"],
+        choices=["mobilenet_v3_small", "efficientnet_b0", "vit_base_patch16_224"],
     )
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
@@ -189,11 +190,20 @@ def main():
         print(f"Error: Split partitions not found in {args.splits_dir}")
         print("Please run M1 pipeline first.")
         return
+    
+    # Get data transforms based on model
+    train_transform, val_transform, test_transform = get_default_transforms(
+        model_name=args.model,
+        image_size=224
+    )
 
     # Load Data
     print(f"Loading data from {args.splits_dir}...")
-    train_loader, val_loader = get_dataloaders(
-        train_csv, val_csv, root_dir=args.data_dir, batch_size=args.batch_size
+    train_loader = get_train_dataloader(
+        train_csv, root_dir=args.data_dir, batch_size=args.batch_size, transforms=train_transform
+    )
+    val_loader = get_val_dataloader(
+        val_csv, root_dir=args.data_dir, batch_size=args.batch_size, transforms=val_transform
     )
 
     # Debug mode: truncate datasets
@@ -253,7 +263,7 @@ def main():
         # Save best model to checkpoint
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            ckpt_path = Path(args.checkpoint_dir) / f"cnn_baseline_{args.model}.pt"
+            ckpt_path = Path(args.checkpoint_dir) / f"{args.model}.pt"
             torch.save(
                 {
                     "epoch": epoch,

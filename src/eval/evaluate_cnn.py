@@ -32,6 +32,7 @@ from tqdm import tqdm
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Load helpers for data and model loading
+from src.utils.transformations import get_default_transforms
 from src.utils.loader_cnn import get_test_dataloader
 from src.utils.baseline_models_cnn import get_model
 
@@ -89,7 +90,7 @@ def main():
         "--model-name",
         type=str,
         required=True,
-        choices=["mobilenet_v3_small", "efficientnet_b0"],
+        choices=["mobilenet_v3_small", "efficientnet_b0", "vit_base_patch16_224"],
     )
     parser.add_argument("--splits-dir", type=str, default="data/splits")
     parser.add_argument("--data-dir", type=str, default=".")
@@ -131,8 +132,14 @@ def main():
             continue
 
         print(f"\nEvaluating on {name}...")
+        # Get appropriate transforms
+        _, _, transform_test = get_default_transforms(
+            model_name=args.model_name, image_size=224
+        )
+
+        # Create DataLoader
         loader = get_test_dataloader(
-            csv_path, root_dir=args.data_dir, batch_size=args.batch_size
+            csv_path, root_dir=args.data_dir, batch_size=args.batch_size, transforms=transform_test
         )
 
         # Evaluate model

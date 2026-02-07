@@ -2,9 +2,9 @@ import torch
 from torchvision import transforms
 from timm.data import create_transform
 
-def get_transforms(model_name: str, image_size: int = 224, **kwargs):
+def get_default_transforms(model_name: str, image_size: int = 224):
     """
-    Returns appropriate data transformations for the given model.
+    Returns appropriate default data transformations for the given model.
 
     Args:
         model_name: Name of the model (e.g., 'mobilenet_v3_small', 'efficientnet_b0', 'vit_base_patch16_224')
@@ -14,7 +14,9 @@ def get_transforms(model_name: str, image_size: int = 224, **kwargs):
     """
 
     if model_name in ["mobilenet_v3_small", "efficientnet_b0"]:
-        # Standard transforms for CNNs
+        # Standard ImageNet normalization statistics for RGB channels
+        # These specific mean/std values are required because the pre-trained models
+        # (MobileNet, EfficientNet) were trained on ImageNet using this distribution.
         normalize = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225],
@@ -37,7 +39,16 @@ def get_transforms(model_name: str, image_size: int = 224, **kwargs):
             ]
         )
 
-    elif model_name == "vit_base_patch16_224":
+        test_transform = transforms.Compose(
+            [
+                transforms.Resize((image_size, image_size)),
+                transforms.ToTensor(),
+                normalize,
+            ]
+        )
+
+
+    elif model_name in ["vit_base_patch16_224"]:
         # Use timm's create_transform for ViT
         train_transform = create_transform(
             input_size=image_size,
@@ -48,7 +59,13 @@ def get_transforms(model_name: str, image_size: int = 224, **kwargs):
             input_size=image_size,
             is_training=False
         )
+
+        test_transform = create_transform(
+            input_size=image_size,
+            is_training=False
+        )
+
     else:
         raise ValueError(f"Unsupported model name: {model_name}")
 
-    return train_transform, val_transform
+    return train_transform, val_transform, test_transform

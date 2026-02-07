@@ -1,8 +1,10 @@
-# Plant Disease Classification (ViT) — Milestone 1: Data Indexing & Label Harmonization
+# Plant Disease Classification (ViT) 
+
+## Milestone 1: Data Indexing & Label Harmonization
 
 Milestone 1 (M1) prepares **reproducible, training-ready datasets** for a plant disease classification project. It standardizes two datasets with different label conventions (**PlantVillage** and **PlantDoc**).
 
-## 1. Baseline Data Protocol (Source + Target)
+### 1. Baseline Data Protocol (Source + Target)
 
 This project evaluates robustness under dataset domain shift:
 
@@ -15,9 +17,9 @@ This project evaluates robustness under dataset domain shift:
 
 ---
 
-## 2. Repository Expectations
+### 2. Repository Expectations
 
-### 2.1 Dataset placement
+#### 2.1 Dataset placement
 
 Place raw datasets under `data/raw/` exactly as follows:
 ```
@@ -42,7 +44,7 @@ data/raw/
 
 Supported formats: `.jpg`, `.jpeg`, `.png` (case-insensitive)
 
-### 2.2 Environment setup
+#### 2.2 Environment setup
 
 From the **repository root**:
 ```bash
@@ -53,7 +55,7 @@ pip install -r requirements.txt
 
 ---
 
-## 3. Milestone 1 Outputs (What you get)
+### 3. Milestone 1 Outputs (What you get)
 
 M1 produces three categories of artifacts:
 
@@ -65,11 +67,11 @@ Downstream training (M2–M5) reads only the split CSVs.
 
 ---
 
-## 4. How to Run M1 (Reproducible Pipeline)
+### 4. How to Run M1 (Reproducible Pipeline)
 
 Run the following steps in order from the repository root.
 
-### Step 1 — Index datasets (image inventory)
+#### Step 1 — Index datasets (image inventory)
 ```bash
 python scripts/make_index.py
 ```
@@ -85,7 +87,7 @@ python scripts/make_index.py
 
 ---
 
-### Step 2 — Build label mapping (intersection-only 26 classes)
+#### Step 2 — Build label mapping (intersection-only 26 classes)
 ```bash
 python scripts/apply_label_map.py
 ```
@@ -114,7 +116,7 @@ python scripts/apply_label_map.py
 
 ---
 
-### Step 3 — Generate mapped split files (training-ready CSVs)
+#### Step 3 — Generate mapped split files (training-ready CSVs)
 ```bash
 python scripts/build_mapped_splits.py
 ```
@@ -135,7 +137,7 @@ Writes to the splits directory configured in the script (commonly `data/splits/`
 
 ---
 
-## 5. Output Locations (Files to expect)
+### 5. Output Locations (Files to expect)
 
 After Steps 1–3, you should have:
 ```bash
@@ -166,7 +168,7 @@ find . -maxdepth 4 -name "pv_train.csv" -o -name "plantdoc_test_mapped.csv"
 
 ---
 
-## 6. Quick Sanity Checks (Optional)
+### 6. Quick Sanity Checks (Optional)
 
 From the folder containing the split files:
 ```bash
@@ -179,7 +181,7 @@ print('PD test', len(pd.read_csv('plantdoc_test_mapped.csv')))"
 
 ---
 
-## 7. Label Harmonization Notes
+### 7. Label Harmonization Notes
 
 - **Canonical label format:** `crop__condition`
 - **Normalization:** lowercase; spaces/hyphens → underscores
