@@ -9,8 +9,10 @@ The script replaces the final classification layer to match the
 required number of classes for the Plant Disease Detection project (default: 26).
 """
 
+from xml.parsers.expat import model
 import torch.nn as nn
 from torchvision import models
+import timm
 
 
 def get_model(model_name: str, num_classes: int = 26, pretrained: bool = True):
@@ -47,6 +49,22 @@ def get_model(model_name: str, num_classes: int = 26, pretrained: bool = True):
         # We replace the last layer (index 1) to output 'num_classes' instead of 1000.
         in_features = model.classifier[1].in_features
         model.classifier[1] = nn.Linear(in_features, num_classes)
+
+    elif model_name == "vit_base_patch16_224":
+        model = timm.create_model("vit_base_patch16_224", pretrained=pretrained, num_classes=num_classes)
+
+        # Freeze ViT layers
+        for param in model.blocks.parameters():
+            param.requires_grad = False
+
+        # Unfreeze classifier
+        for param in model.head.parameters():
+            param.requires_grad = True
+
+        # Unfreeze last few encoder layers
+        for block in model.blocks[-4:]:
+            for param in block.parameters():
+                param.requires_grad = True
 
     else:
         raise ValueError(f"Unknown model name: {model_name}")
