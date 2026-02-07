@@ -185,8 +185,8 @@ def main():
     # Deserialize hyperparameters
     epochs = config["hyperparameters"].get("epochs", 10)
     batch_size = config["hyperparameters"].get("batch_size", 32)
-    lr = config["hyperparameters"].get("lr", 0.001)
-
+    lr = config["hyperparameters"].get("learning_rate", 0.001)
+    weight_decay = config["hyperparameters"].get("weight_decay", 0.0)
 
     # Setup directories
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -238,7 +238,7 @@ def main():
 
     # Optimization
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     # Training Loop
     best_val_acc = 0.0
