@@ -1,3 +1,8 @@
+"""
+This module provides data transformation pipelines for different model architectures.
+TODO for M4: Create builder design to build a transform pipeline based on configuration.
+"""
+
 import torch
 from torchvision import transforms
 from timm.data import create_transform
@@ -14,6 +19,11 @@ def get_default_transforms(model_name: str, image_size: int = 224):
     """
 
     if model_name in ["mobilenet_v3_small", "efficientnet_b0"]:
+        # Transformations:
+        #- Training data: Includes random horizontal flips for augmentation
+        #- Validation data: Deterministic transforms only (no augmentation)
+        #- Both use ImageNet normalization to match pre-trained model expectations
+
         # Standard ImageNet normalization statistics for RGB channels
         # These specific mean/std values are required because the pre-trained models
         # (MobileNet, EfficientNet) were trained on ImageNet using this distribution.

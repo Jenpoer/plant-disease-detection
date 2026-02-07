@@ -4,6 +4,7 @@ This module provides a factory function for loading and customizing CNN baseline
 Supported architectures:
 - MobileNetV3 Small: Optimized for speed and low-resource devices.
 - EfficientNet-B0: Balanced performance focused on accuracy and efficiency.
+- Vision Transformer (ViT) Base Patch16 224: Transformer-based model adapted for image classification.
 
 The script replaces the final classification layer to match the
 required number of classes for the Plant Disease Detection project (default: 26).
@@ -17,8 +18,8 @@ import timm
 
 def get_model(model_name: str, num_classes: int = 26, pretrained: bool = True):
     """
-    Entry point to get a CNN model.
-    Supported: 'mobilenet_v3_small', 'efficientnet_b0'
+    Entry point to get a model.
+    Supported: 'mobilenet_v3_small', 'efficientnet_b0', 'vit_base_patch16_224'
     """
     weights = "DEFAULT" if pretrained else None
 

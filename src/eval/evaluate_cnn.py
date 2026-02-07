@@ -33,8 +33,8 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Load helpers for data and model loading
 from src.utils.transformations import get_default_transforms
-from src.utils.loader_cnn import get_test_dataloader
-from src.utils.baseline_models_cnn import get_model
+from utils.dataloaders import get_test_dataloader
+from utils.baseline_models import get_model
 
 
 def evaluate(model, loader, device):

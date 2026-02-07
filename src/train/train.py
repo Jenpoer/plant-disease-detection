@@ -1,7 +1,7 @@
 """
-CNN Baseline Training Script
+Model Training Script
 
-This module trains CNN models (MobileNetV3 or EfficientNetB0) for plant disease classification.
+This module trains models for plant disease classification.
 It handles the complete training pipeline including:
 - Data loading from M1 split CSVs
 - Model initialization with pre-trained weights
@@ -10,8 +10,7 @@ It handles the complete training pipeline including:
 - Training metrics logging to CSV
 
 Usage:
-    python src/train/train_cnn.py --model mobilenet_v3_small --epochs 10
-    python src/train/train_cnn.py --model efficientnet_b0 --epochs 10 --batch-size 64
+    python src/train/train.py --config configs/baseline_mobilenet_v3_small.json
 """
 
 import argparse
@@ -31,8 +30,8 @@ import json
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Import helpers for data and model loading
-from src.utils.loader_cnn import get_train_dataloader, get_val_dataloader
-from src.utils.baseline_models_cnn import get_model
+from utils.dataloaders import get_train_dataloader, get_val_dataloader
+from utils.baseline_models import get_model
 from src.utils.transformations import get_default_transforms
 
 # Only runs if on MacOS (Darwin is the OS kernel name for MacOS)
@@ -180,7 +179,7 @@ def main():
     checkpoint_dir = config.get("checkpoint_dir", "checkpoints")
     data_dir = config.get("data_dir", ".")
     splits_dir = config.get("splits_dir", "data/splits")
-    model_name = config.get("model_name")
+    model_name = config["model_name"] # should throw an error if missing
     
     # Deserialize hyperparameters
     epochs = config["hyperparameters"].get("epochs", 10)

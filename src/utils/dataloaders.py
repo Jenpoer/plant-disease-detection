@@ -3,8 +3,6 @@ This module handles data loading and preprocessing for CNN models.
 
 Key features:
 - PlantDiseaseDataset: A custom PyTorch Dataset that reads from M1 mapped CSVs.
-- Image transformation pipelines: Including minor transformation like resizing,
-  horizontal flipping (for training), and standard ImageNet normalization.
 - DataLoader factory functions for training, validation, and testing sets.
 """
 
@@ -60,10 +58,7 @@ def get_train_dataloader(
     """
     Creates DataLoaders for training and validation with appropriate data augmentation.
 
-    This function sets up the data pipeline for CNN training:
-    - Training data: Includes random horizontal flips for augmentation
-    - Validation data: Deterministic transforms only (no augmentation)
-    - Both use ImageNet normalization to match pre-trained model expectations
+    This function sets up the data pipeline for model training:
 
     Args:
         train_csv: Path to training split CSV file
@@ -75,7 +70,7 @@ def get_train_dataloader(
         transforms: Optional custom transforms to apply.
 
     Returns:
-        Tuple of (train_loader, val_loader) as PyTorch DataLoaders
+        train_loader: PyTorch DataLoader for training data
     """
 
     train_dataset = PlantDiseaseDataset(train_csv, root_dir, transform=transforms)
@@ -109,7 +104,7 @@ def get_val_dataloader(
         transforms: Optional custom transforms to apply.
 
     Returns:
-        DataLoader: PyTorch DataLoader for validation data
+        val_loader: PyTorch DataLoader for validation data
     """
 
     val_dataset = PlantDiseaseDataset(val_csv, root_dir, transform=transforms)
@@ -145,7 +140,7 @@ def get_test_dataloader(
         transforms: Optional custom transforms to apply.
 
     Returns:
-        DataLoader: PyTorch DataLoader for test data
+        test_loader: PyTorch DataLoader for test data
     """
 
     test_dataset = PlantDiseaseDataset(test_csv, root_dir, transform=transforms)
