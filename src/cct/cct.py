@@ -5,7 +5,7 @@ from .utils.tokenizer import Tokenizer
 from .utils.helpers import pe_check, fc_check
 
 try:
-    from timm.models.registry import register_model
+    from timm.models import register_model
 except ImportError:
     from .registry import register_model
 

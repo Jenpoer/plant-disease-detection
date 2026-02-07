@@ -18,7 +18,7 @@ def get_default_transforms(model_name: str, image_size: int = 224):
         A tuple of (train_transform, val_transform) suitable for the specified model.
     """
 
-    if model_name in ["mobilenet_v3_small", "efficientnet_b0"]:
+    if model_name in ["mobilenet_v3_small", "efficientnet_b0", "cct_7x2_384"]:
         # Transformations:
         #- Training data: Includes random horizontal flips for augmentation
         #- Validation data: Deterministic transforms only (no augmentation)
@@ -56,7 +56,6 @@ def get_default_transforms(model_name: str, image_size: int = 224):
                 normalize,
             ]
         )
-
 
     elif model_name in ["vit_base_patch16_224"]:
         # Use timm's create_transform for ViT
