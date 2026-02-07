@@ -1,7 +1,7 @@
 """
-CNN Model Evaluation Script
+Model Evaluation Script
 
-This module evaluates trained CNN models on test datasets and computes comprehensive metrics.
+This module evaluates trained models on test datasets and computes comprehensive metrics.
 It handles:
 - Loading trained model checkpoints
 - Evaluating on multiple test sets (PlantVillage in-domain, PlantDoc cross-domain)
@@ -10,8 +10,8 @@ It handles:
 - Saving results to CSV for comparison
 
 Usage:
-    python src/eval/evaluate_cnn.py --model-path checkpoints/cnn_baseline_mobilenet_v3_small.pt --model-name mobilenet_v3_small
-    python src/eval/evaluate_cnn.py --model-name all  # Evaluate all available models
+    python src/eval/evaluate.py --model-path checkpoints/cnn_baseline_mobilenet_v3_small.pt --model-name mobilenet_v3_small
+    python src/eval/evaluate.py --model-name all  # Evaluate all available models
 """
 
 import argparse
