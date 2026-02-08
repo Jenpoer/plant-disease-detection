@@ -11,5 +11,5 @@
         "weight_decay": 0.05
     },
 
-    "transformations": {}
+    "transformations": []
 }

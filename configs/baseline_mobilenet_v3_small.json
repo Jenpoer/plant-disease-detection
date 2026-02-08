@@ -10,5 +10,5 @@
         "learning_rate": 0.001
     },
 
-    "transformations": {}
+    "transformations": []
 }

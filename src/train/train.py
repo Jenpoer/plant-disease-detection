@@ -281,7 +281,7 @@ def main():
         # Save best model to checkpoint
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            ckpt_path = Path(checkpoint_dir) / f"{model_name}.pt"
+            ckpt_path = Path(checkpoint_dir) / f"{Path(args.config).stem}.pt"
             torch.save(
                 {
                     "epoch": epoch,
@@ -301,7 +301,7 @@ def main():
     )
 
     # Save logs
-    log_path = Path(output_dir) / f"training_log_{model_name}.csv"
+    log_path = Path(output_dir) / f"training_log_{Path(args.config).stem}.csv"
     pd.DataFrame(history).to_csv(log_path, index=False)
     print(f"Logs saved to {log_path}")
 

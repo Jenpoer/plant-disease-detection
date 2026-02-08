@@ -14,8 +14,7 @@ from xml.parsers.expat import model
 import torch.nn as nn
 from torchvision import models
 import timm
-# import src.cct.cct
-from src.cct.cct import cct_14_7x2_384
+import src.cct.cct as cct
 # import ssl
 
 # # Bypass SSL certificate verification for model downloading
@@ -57,7 +56,7 @@ def get_model(model_name: str, num_classes: int = 26, pretrained: bool = True):
         model.classifier[1] = nn.Linear(in_features, num_classes)
 
     elif model_name == "vit_base_patch16_224":
-        model = timm.create_model("vit_base_patch16_224", pretrained=pretrained, num_classes=num_classes)
+        model = timm.create_model("vit_base_patch16_224", img_size=224, pretrained=pretrained, num_classes=num_classes)
 
         # Freeze ViT layers
         for param in model.blocks.parameters():
@@ -72,9 +71,8 @@ def get_model(model_name: str, num_classes: int = 26, pretrained: bool = True):
             for param in block.parameters():
                 param.requires_grad = True
     
-    elif model_name == "cct_7x2_384":
-        model = cct_14_7x2_384(img_size=224, pretrained=pretrained, progress=True, num_classes=num_classes) 
-        # model = timm.create_model("cct_7x2_384", pretrained=pretrained, num_classes=num_classes) 
+    elif model_name == "cct_14_7x2_224":
+        model = timm.create_model("cct_14_7x2_224", img_size=224,pretrained=pretrained, num_classes=num_classes) 
 
         for name, param in model.named_parameters():
             if any(x in name for x in ["classifier.fc", "blocks.13", "blocks.12"]):

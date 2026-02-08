@@ -33,8 +33,8 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Load helpers for data and model loading
 from src.utils.transformations import get_default_transforms
-from utils.dataloaders import get_test_dataloader
-from utils.baseline_models import get_model
+from src.utils.dataloaders import get_test_dataloader
+from src.utils.baseline_models import get_model
 
 
 def evaluate(model, loader, device):
@@ -82,7 +82,7 @@ def evaluate(model, loader, device):
 
 def main():
     # Setup argument parser
-    parser = argparse.ArgumentParser(description="Evaluate CNN")
+    parser = argparse.ArgumentParser(description="Evaluate model on test datasets")
     parser.add_argument(
         "--model-path", type=str, required=True, help="Path to .pt checkpoint"
     )
@@ -90,7 +90,7 @@ def main():
         "--model-name",
         type=str,
         required=True,
-        choices=["mobilenet_v3_small", "efficientnet_b0", "vit_base_patch16_224"],
+        choices=["mobilenet_v3_small", "efficientnet_b0", "vit_base_patch16_224", "cct_14_7x2_224"],
     )
     parser.add_argument("--splits-dir", type=str, default="data/splits")
     parser.add_argument("--data-dir", type=str, default=".")
