@@ -291,9 +291,154 @@ Classes (10 for MobileNet and 9 for EfficientNetB0) with 0.00 scores on PlantDoc
 - PlantDoc: Natural field conditions, cluttered backgrounds, variable lighting
 
 ---
+## 9. M3: ViT Training + Evaluation
 
-## 9. Next Milestones (Context)
+M3 implements a ViT baseline using pre-trained models from `timm` library to establish performance benchmarks on both in-domain (PlantVillage) and cross-domain (PlantDoc) test sets.
 
-- **M3:** ViT training + evaluation
+**Key changes from M2:**
+- Added `timm` library as part of `requirements.txt`
+- Consolidated all CNN training scripts into one for all models (removed all *_cnn suffixes from src files)
+- Use JSON files under `configs` directory to specify training configurations instead of command line arguments
+- Refactored transforms outside of dataloaders into its own file (**to be used for M4**)
+
+### 9.1 Training a model
+
+#### 9.1.1 Specify a JSON configuration under `configs` directory.
+
+For example:
+**configs/baseline_vit_base_patch16_224.json**
+```
+{
+    "model_name": "vit_base_patch16_224",
+    "data_dir": ".",
+    "splits_dir": "data/splits",
+    "checkpoint_dir": "checkpoints/baseline",
+
+    "hyperparameters": {
+        "batch_size": 32,
+        "num_epochs": 10,
+        "learning_rate": 0.0001,
+        "weight_decay": 0.05
+    },
+
+    "transformations": []
+}
+```
+
+#### 9.1.2 Run the training script, passing in the config file as a command line argument
+```bash
+python src/train/train.py --config configs/baseline_vit_base_patch16_224.json
+```
+
+**Outputs:**
+- `checkpoints/<config file name>.pt`: Best model checkpoint (saved when validation accuracy improves)
+- `outputs/training_log_<config file name>.csv`: Training metrics per epoch (loss, accuracy, time)
+
+**Expected Results:**
+- cct_14_7x2_224: ~99.64% validation accuracy
+- maxvit_base_tf_224: ~98.97% validation accuracy
+- swin_base_patch4_window7_224: ~99.61% validation accuracy
+- vit_base_patch16_224: ~99.53% validation accuracy
+
+### 9.2 Evaluating a Model
+Evaluate a trained model on both test sets (PlantVillage and PlantDoc):
+
+```bash
+# Example: Evaluate vit_base_patch16_224
+python src/eval/evaluate.py \
+  --model-path checkpoints/baseline_vit_base_patch16_224.pt \
+  --model-name vit_base_patch16_224 \
+  --output-file outputs/baseline_vit_base_patch16_224.csv
+```
+
+**Optional arguments:**
+- `--batch-size`: Batch size (default: 32)
+- `--data-dir`: Root directory for images (default: `.`)
+- `--splits-dir`: Directory containing split CSVs (default: `data/splits`)
+- `--output-file`: CSV file for results (default: `outputs/evaluation_results.csv`)
+
+**Outputs:**
+- `outputs/evaluation_results.csv`: Aggregate metrics (Accuracy, Precision, Recall, F1 scores)
+- `outputs/report_<model>_<testset>.txt`: Per-class classification reports
+
+**Expected Results:**
+
+| Model | PV Test (In-Domain) | PlantDoc Test (Cross-Domain) |
+|:---|:---|:---|
+| **cct_14_7x2_224** | Acc: 99.45%, F1 (Weighted): 0.9945 | Acc: 31.96%, F1 (Weighted): 0.2872 |
+| **maxvit_base_tf_224** | Acc: 98.95%, F1 (Weighted): 0.9895 | Acc: 33.33%, F1 (Weighted): 0.3017 |
+| **swin_base_patch4_window7_224** | Acc: 99.78%, F1 (Weighted): 0.9978 | Acc: 34.25%, F1 (Weighted): 0.2851 |
+| **vit_base_patch16_224** | Acc: 98.36%, F1 (Weighted): 0.9834 | Acc: 29.22%, F1 (Weighted): 0.2692 |
+
+> **Note:** The severe performance drop on PlantDoc (~98-99% -> ~29-34%) confirms a significant domain gap.
+
+### 9.3 Visualizing Training Progress
+
+Generate plots for loss and accuracy from the training logs:
+
+```bash
+python src/utils/plot_training.py \
+  --log-file outputs/training_log_baseline_vit_base_patch16_224.csv \
+  --output-name training_metrics_vit_base_patch16_224.png
+```
+
+**Optional arguments:**
+- `--log-file`: Path to training_log.csv generated during trainign process (default: `outputs/training_log.csv`)
+- `--output-dir`: Directory to save plots (default: `outputs/plots`)
+- `--output-name`: Filename for the output plot image (default: `training_metrics.png`)
+
+**Outputs:**
+- `<output dir>/<output name>.png`: Combined loss and accuracy curves
+
+### 9.4 Understanding the Results
+Refer to **Section 8.4** under **Milestone 2: CNN Baseline Training & Evaluation**.
+
+---
+## 10. Milestone 4: Robustness improvements (ROI and/or augmentations) + ablations
+
+**WORK IN PROGRESS**
+
+- Allow users to specify a series of data transformation procedures in the training config file as such:
+
+  **configs/baseline_vit_base_patch16_224.json**
+  ```
+  {
+      "model_name": "vit_base_patch16_224",
+      "data_dir": ".",
+      "splits_dir": "data/splits",
+      "checkpoint_dir": "checkpoints/baseline",
+
+      "hyperparameters": {
+          "batch_size": 32,
+          "num_epochs": 10,
+          "learning_rate": 0.0001,
+          "weight_decay": 0.05
+      },
+
+      "transformations": [
+        {
+          "name": "random_rotation",
+          "params": {
+            "degrees": 10
+          }
+        },
+        {
+          "name": "color_jitter",
+          "params": {
+            "brightness": 0,
+            "contrast": 0,
+            "saturation": 0,
+            "hue": 0
+          }
+        }
+      ]
+  }
+  ```
+  And construct the torchvision transform Compose according to the specification
+
+---
+
+## 11. Next Milestones (Context)
+
 - **M4:** Robustness improvements (ROI and/or augmentations) + ablations
 - **M5:** Reliability layer (calibration + abstain option)
