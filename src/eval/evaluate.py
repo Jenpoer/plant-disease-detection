@@ -90,7 +90,7 @@ def main():
         "--model-name",
         type=str,
         required=True,
-        choices=["mobilenet_v3_small", "efficientnet_b0", "vit_base_patch16_224", "cct_14_7x2_224", "swin_base_patch4_window7_224"],
+        choices=["mobilenet_v3_small", "efficientnet_b0", "vit_base_patch16_224", "cct_14_7x2_224", "swin_base_patch4_window7_224", "maxvit_base_tf_224"],
     )
     parser.add_argument("--splits-dir", type=str, default="data/splits")
     parser.add_argument("--data-dir", type=str, default=".")

@@ -99,7 +99,7 @@ def get_default_transforms(model, model_name: str, image_size: int = 224):
             ]
         )
 
-    elif model_name in ["vit_base_patch16_224", "swin_base_patch4_window7_224"]:
+    elif model_name in ["vit_base_patch16_224", "swin_base_patch4_window7_224", "maxvit_base_tf_224"]:
         # Use timm's create_transform for ViT
         data_config = resolve_model_data_config(model)
 

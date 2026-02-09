@@ -98,6 +98,21 @@ def get_model(model_name: str, num_classes: int = 26, pretrained: bool = True):
         for param in model.head.parameters():
             param.requires_grad = True
 
+    elif model_name == "maxvit_base_tf_224":
+        model = timm.create_model("maxvit_base_tf_224", img_size=224, pretrained=pretrained, num_classes=num_classes)
+
+        # Freeze all layers first
+        for param in model.parameters():
+            param.requires_grad = False
+
+        # Unfreeze last stage and the head layers
+        for stage in model.stages[-1:]:
+            for param in stage.parameters():
+                param.requires_grad = True
+
+        for param in model.head.parameters():
+            param.requires_grad = True
+
     else:
         raise ValueError(f"Unknown model name: {model_name}")
 
