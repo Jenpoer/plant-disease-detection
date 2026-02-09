@@ -80,6 +80,24 @@ def get_model(model_name: str, num_classes: int = 26, pretrained: bool = True):
             else:
                 param.requires_grad = False
 
+    elif model_name == "swin_base_patch4_window7_224":
+        model = timm.create_model("swin_base_patch4_window7_224", img_size=224, pretrained=pretrained, num_classes=num_classes)
+        
+        # Freeze all layers first
+        for param in model.parameters():
+            param.requires_grad = False
+
+        # Unfreeze last two stages and the norm and head layers
+        for stage in model.layers[-2:]:
+            for param in stage.parameters():
+                param.requires_grad = True
+
+        for param in model.norm.parameters():
+            param.requires_grad = True
+
+        for param in model.head.parameters():
+            param.requires_grad = True
+
     else:
         raise ValueError(f"Unknown model name: {model_name}")
 

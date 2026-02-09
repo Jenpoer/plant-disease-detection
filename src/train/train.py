@@ -32,7 +32,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 # Import helpers for data and model loading
 from src.utils.dataloaders import get_train_dataloader, get_val_dataloader
 from src.utils.baseline_models import get_model
-from src.utils.transformations import get_default_transforms
+from src.utils.transformations import get_transforms
 
 # Only runs if on MacOS (Darwin is the OS kernel name for MacOS)
 # Disable SSL verification to fix for MacOS SSL error when downloading models
@@ -209,8 +209,14 @@ def main():
         print("Please run M1 pipeline first.")
         return
     
+    # Model
+    print(f"Initializing {model_name}...")
+    model = get_model(model_name, num_classes=26)
+    model.to(device)
+    
     # Get data transforms based on model
-    train_transform, val_transform, test_transform = get_default_transforms(
+    train_transform, val_transform, test_transform = get_transforms(
+        model=model,
         model_name=model_name,
         image_size=224
     )
@@ -229,11 +235,6 @@ def main():
         print("DEBUG MODE: Truncating datasets")
         train_loader.dataset.data = train_loader.dataset.data.head(100)
         val_loader.dataset.data = val_loader.dataset.data.head(20)
-
-    # Model
-    print(f"Initializing {model_name}...")
-    model = get_model(model_name, num_classes=26)
-    model.to(device)
 
     # Optimization
     criterion = nn.CrossEntropyLoss()

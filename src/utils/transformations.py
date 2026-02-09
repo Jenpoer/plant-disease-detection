@@ -5,13 +5,14 @@ TODO for M4: Create builder design to build a transform pipeline based on config
 
 import torch
 from torchvision import transforms
-from timm.data import create_transform
+from timm.data import create_transform, resolve_model_data_config
 
-def get_transforms(model_name: str, image_size: int = 224, transforms_config: dict = None):
+def get_transforms(model, model_name: str, image_size: int = 224, transforms_config: dict = None):
     """
     Returns appropriate data transformations for the given model.
 
     Args:
+        model: The model object (used for ViT models to get data config)
         model_name: Name of the model (e.g., 'mobilenet_v3_small', 'efficientnet_b0', 'vit_base_patch16_224', 'cct_14_7x2_224')
         image_size: Target image size for resizing (default: 224)
         transforms_config: Optional dictionary to customize transformations
@@ -37,7 +38,7 @@ def get_transforms(model_name: str, image_size: int = 224, transforms_config: di
 
             # Add more custom transformations as needed
 
-    train_transform, val_transform, test_transform = get_default_transforms(model_name, image_size)
+    train_transform, val_transform, test_transform = get_default_transforms(model, model_name, image_size)
 
     if transform_steps:
         # Apply custom transforms to each transform pipeline
@@ -47,11 +48,12 @@ def get_transforms(model_name: str, image_size: int = 224, transforms_config: di
 
     return train_transform, val_transform, test_transform
 
-def get_default_transforms(model_name: str, image_size: int = 224):
+def get_default_transforms(model, model_name: str, image_size: int = 224):
     """
     Returns appropriate default data transformations for the given model.
 
     Args:
+        model: The model object (used for ViT models to get data config)
         model_name: Name of the model (e.g., 'mobilenet_v3_small', 'efficientnet_b0', 'vit_base_patch16_224', 'cct_14_7x2_224')
         image_size: Target image size for resizing (default: 224)   
     Returns:
@@ -97,20 +99,22 @@ def get_default_transforms(model_name: str, image_size: int = 224):
             ]
         )
 
-    elif model_name in ["vit_base_patch16_224"]:
+    elif model_name in ["vit_base_patch16_224", "swin_base_patch4_window7_224"]:
         # Use timm's create_transform for ViT
+        data_config = resolve_model_data_config(model)
+
         train_transform = create_transform(
-            input_size=image_size,
+            **data_config,
             is_training=True
         )
 
         val_transform = create_transform(
-            input_size=image_size,
+            **data_config,
             is_training=False
         )
 
         test_transform = create_transform(
-            input_size=image_size,
+            **data_config,
             is_training=False
         )
 
