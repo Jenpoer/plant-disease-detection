@@ -291,7 +291,7 @@ Classes (10 for MobileNet and 9 for EfficientNetB0) with 0.00 scores on PlantDoc
 - PlantDoc: Natural field conditions, cluttered backgrounds, variable lighting
 
 ---
-## 9. M3: ViT Training + Evaluation
+## 9. Milestone 3: ViT Training + Evaluation
 
 M3 implements a ViT baseline using pre-trained models from `timm` library to establish performance benchmarks on both in-domain (PlantVillage) and cross-domain (PlantDoc) test sets.
 
