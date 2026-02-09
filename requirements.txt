@@ -5,3 +5,4 @@ Pillow>=9.0.0
 scikit-learn>=1.0.0
 tqdm>=4.60.0
 matplotlib>=3.5.0
+timm==1.0.24

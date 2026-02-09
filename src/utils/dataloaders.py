@@ -3,8 +3,6 @@ This module handles data loading and preprocessing for CNN models.
 
 Key features:
 - PlantDiseaseDataset: A custom PyTorch Dataset that reads from M1 mapped CSVs.
-- Image transformation pipelines: Including minor transformation like resizing,
-  horizontal flipping (for training), and standard ImageNet normalization.
 - DataLoader factory functions for training, validation, and testing sets.
 """
 
@@ -50,21 +48,17 @@ class PlantDiseaseDataset(Dataset):
         return image, label
 
 
-def get_dataloaders(
+def get_train_dataloader(
     train_csv: str,
-    val_csv: str,
     root_dir: str = ".",
     batch_size: int = 32,
-    img_size: int = 224,
     num_workers: int = 4,
+    transforms: Optional[transforms.Compose] = None,
 ) -> Tuple[DataLoader, DataLoader]:
     """
     Creates DataLoaders for training and validation with appropriate data augmentation.
 
-    This function sets up the data pipeline for CNN training:
-    - Training data: Includes random horizontal flips for augmentation
-    - Validation data: Deterministic transforms only (no augmentation)
-    - Both use ImageNet normalization to match pre-trained model expectations
+    This function sets up the data pipeline for model training:
 
     Args:
         train_csv: Path to training split CSV file
@@ -73,39 +67,13 @@ def get_dataloaders(
         batch_size: Number of samples per batch (default: 32)
         img_size: Target image size for resizing (default: 224)
         num_workers: Number of worker processes for data loading (default: 4)
+        transforms: Optional custom transforms to apply.
 
     Returns:
-        Tuple of (train_loader, val_loader) as PyTorch DataLoaders
+        train_loader: PyTorch DataLoader for training data
     """
-    # Standard ImageNet normalization statistics for RGB channels
-    # These specific mean/std values are required because the pre-trained models
-    # (MobileNet, EfficientNet) were trained on ImageNet using this distribution.
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-    )
 
-    # Train transforms with some augmentation
-    train_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),  # Simple resize for baseline
-            # transforms.RandomResizedCrop(img_size), # Could add later
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]
-    )
-
-    # Val transforms (deterministic)
-    val_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),
-            transforms.ToTensor(),
-            normalize,
-        ]
-    )
-
-    train_dataset = PlantDiseaseDataset(train_csv, root_dir, transform=train_transform)
-    val_dataset = PlantDiseaseDataset(val_csv, root_dir, transform=val_transform)
+    train_dataset = PlantDiseaseDataset(train_csv, root_dir, transform=transforms)
 
     train_loader = DataLoader(
         train_dataset,
@@ -115,6 +83,32 @@ def get_dataloaders(
         pin_memory=True,
     )
 
+    return train_loader
+
+def get_val_dataloader(
+    val_csv: str,
+    root_dir: str = ".",
+    batch_size: int = 32,
+    img_size: int = 224,
+    num_workers: int = 4,
+    transforms: Optional[transforms.Compose] = None) -> DataLoader:
+    """
+    Creates DataLoader for validation.
+
+    Args:
+        val_csv: Path to validation split CSV file
+        root_dir: Root directory for image paths (default: current directory)
+        batch_size: Number of samples per batch (default: 32)
+        img_size: Target image size for resizing (default: 224)
+        num_workers: Number of worker processes for data loading (default: 4)
+        transforms: Optional custom transforms to apply.
+
+    Returns:
+        val_loader: PyTorch DataLoader for validation data
+    """
+
+    val_dataset = PlantDiseaseDataset(val_csv, root_dir, transform=transforms)
+
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
@@ -123,7 +117,7 @@ def get_dataloaders(
         pin_memory=True,
     )
 
-    return train_loader, val_loader
+    return val_loader
 
 
 def get_test_dataloader(
@@ -132,6 +126,7 @@ def get_test_dataloader(
     batch_size: int = 32,
     img_size: int = 224,
     num_workers: int = 4,
+    transforms: Optional[transforms.Compose] = None,
 ) -> DataLoader:
     """
     Creates DataLoader for testing.
@@ -142,25 +137,13 @@ def get_test_dataloader(
         batch_size: Number of samples per batch (default: 32)
         img_size: Target image size for resizing (default: 224)
         num_workers: Number of worker processes for data loading (default: 4)
+        transforms: Optional custom transforms to apply.
 
     Returns:
-        DataLoader: PyTorch DataLoader for test data
+        test_loader: PyTorch DataLoader for test data
     """
-    # Standard ImageNet normalization statistics (RGB)
-    # Required for consistency with training and pre-trained models
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-    )
 
-    test_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),
-            transforms.ToTensor(),
-            normalize,
-        ]
-    )
-
-    test_dataset = PlantDiseaseDataset(test_csv, root_dir, transform=test_transform)
+    test_dataset = PlantDiseaseDataset(test_csv, root_dir, transform=transforms)
 
     return DataLoader(
         test_dataset,

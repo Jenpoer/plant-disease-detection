@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 
-def plot_training_metrics(log_file, output_dir="outputs/plots"):
+def plot_training_metrics(log_file, output_dir="outputs/plots", output_name="training_metrics.png"):
     """
     Generate training and validation loss/accuracy plots.
     
@@ -52,7 +52,7 @@ def plot_training_metrics(log_file, output_dir="outputs/plots"):
     plt.tight_layout()
     
     # Save plot
-    plot_path = output_path / "training_metrics.png"
+    plot_path = output_path / output_name
     plt.savefig(plot_path, dpi=150, bbox_inches='tight')
     print(f"✓ Saved training plot to {plot_path}")
     
@@ -85,6 +85,8 @@ def main():
                         help="Path to training_log.csv")
     parser.add_argument("--output-dir", type=str, default="outputs/plots",
                         help="Directory to save plots")
+    parser.add_argument("--output-name", type=str, default="training_metrics.png",
+                        help="Filename for the output plot image")
     
     args = parser.parse_args()
     
@@ -94,7 +96,7 @@ def main():
         print("Please run training first to generate the log file.")
         return
     
-    plot_training_metrics(args.log_file, args.output_dir)
+    plot_training_metrics(args.log_file, args.output_dir, args.output_name)
 
 
 if __name__ == "__main__":

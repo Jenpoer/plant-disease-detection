@@ -1,7 +1,7 @@
 """
-CNN Baseline Training Script
+Model Training Script
 
-This module trains CNN models (MobileNetV3 or EfficientNetB0) for plant disease classification.
+This module trains models for plant disease classification.
 It handles the complete training pipeline including:
 - Data loading from M1 split CSVs
 - Model initialization with pre-trained weights
@@ -10,8 +10,7 @@ It handles the complete training pipeline including:
 - Training metrics logging to CSV
 
 Usage:
-    python src/train/train_cnn.py --model mobilenet_v3_small --epochs 10
-    python src/train/train_cnn.py --model efficientnet_b0 --epochs 10 --batch-size 64
+    python src/train/train.py --config configs/baseline_mobilenet_v3_small.json
 """
 
 import argparse
@@ -25,13 +24,15 @@ import ssl
 from pathlib import Path
 import platform
 from tqdm import tqdm
+import json
 
 # Add project root to path BEFORE importing local modules
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Import helpers for data and model loading
-from src.utils.loader_cnn import get_dataloaders
-from src.utils.baseline_models_cnn import get_model
+from src.utils.dataloaders import get_train_dataloader, get_val_dataloader
+from src.utils.baseline_models import get_model
+from src.utils.transformations import get_transforms
 
 # Only runs if on MacOS (Darwin is the OS kernel name for MacOS)
 # Disable SSL verification to fix for MacOS SSL error when downloading models
@@ -150,27 +151,45 @@ def validate(model, loader, criterion, device):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train CNN Baseline")
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="mobilenet_v3_small",
-        choices=["mobilenet_v3_small", "efficientnet_b0"],
-    )
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--data-dir", type=str, default=".")
-    parser.add_argument("--splits-dir", type=str, default="data/splits")
-    parser.add_argument("--output-dir", type=str, default="outputs")
-    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints")
+    parser = argparse.ArgumentParser(description="Train Models for Plant Disease Classification")
+    # parser.add_argument(
+    #     "--model",
+    #     type=str,
+    #     default="mobilenet_v3_small",
+    #     choices=["mobilenet_v3_small", "efficientnet_b0", "vit_base_patch16_224"],
+    # )
+    # parser.add_argument("--epochs", type=int, default=10)
+    # parser.add_argument("--batch-size", type=int, default=32)
+    # parser.add_argument("--lr", type=float, default=0.001)
+    # parser.add_argument("--data-dir", type=str, default=".")
+    # parser.add_argument("--splits-dir", type=str, default="data/splits")
+    # parser.add_argument("--output-dir", type=str, default="outputs")
+    # parser.add_argument("--checkpoint-dir", type=str, default="checkpoints")
+    parser.add_argument("--config", type=str, required=True, help="Path to config JSON file")
     parser.add_argument("--debug", action="store_true", help="Run with small subset")
 
     args = parser.parse_args()
 
+    # Load config file
+    with open(args.config, "r") as f:
+        config = json.load(f)
+
+    # Deserialize paths and settings
+    output_dir = config.get("output_dir", "outputs")
+    checkpoint_dir = config.get("checkpoint_dir", "checkpoints")
+    data_dir = config.get("data_dir", ".")
+    splits_dir = config.get("splits_dir", "data/splits")
+    model_name = config["model_name"] # should throw an error if missing
+    
+    # Deserialize hyperparameters
+    epochs = config["hyperparameters"].get("epochs", 10)
+    batch_size = config["hyperparameters"].get("batch_size", 32)
+    lr = config["hyperparameters"].get("learning_rate", 0.001)
+    weight_decay = config["hyperparameters"].get("weight_decay", 0.0)
+
     # Setup directories
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    Path(args.checkpoint_dir).mkdir(parents=True, exist_ok=True)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
     # Device switching to utilize mps/gpu if available, otherwise use CPU
     device = torch.device(
@@ -181,19 +200,34 @@ def main():
     print(f"Using device: {device}")
 
     # Data Paths
-    train_csv = Path(args.splits_dir) / "pv_train.csv"
-    val_csv = Path(args.splits_dir) / "pv_val.csv"
+    train_csv = Path(splits_dir) / "pv_train.csv"
+    val_csv = Path(splits_dir) / "pv_val.csv"
 
     # Check if split partitions exist
     if not train_csv.exists() or not val_csv.exists():
-        print(f"Error: Split partitions not found in {args.splits_dir}")
+        print(f"Error: Split partitions not found in {splits_dir}")
         print("Please run M1 pipeline first.")
         return
+    
+    # Model
+    print(f"Initializing {model_name}...")
+    model = get_model(model_name, num_classes=26)
+    model.to(device)
+    
+    # Get data transforms based on model
+    train_transform, val_transform, test_transform = get_transforms(
+        model=model,
+        model_name=model_name,
+        image_size=224
+    )
 
     # Load Data
-    print(f"Loading data from {args.splits_dir}...")
-    train_loader, val_loader = get_dataloaders(
-        train_csv, val_csv, root_dir=args.data_dir, batch_size=args.batch_size
+    print(f"Loading data from {splits_dir}...")
+    train_loader = get_train_dataloader(
+        train_csv, root_dir=data_dir, batch_size=batch_size, transforms=train_transform
+    )
+    val_loader = get_val_dataloader(
+        val_csv, root_dir=data_dir, batch_size=batch_size, transforms=val_transform
     )
 
     # Debug mode: truncate datasets
@@ -202,14 +236,9 @@ def main():
         train_loader.dataset.data = train_loader.dataset.data.head(100)
         val_loader.dataset.data = val_loader.dataset.data.head(20)
 
-    # Model
-    print(f"Initializing {args.model}...")
-    model = get_model(args.model, num_classes=26)
-    model.to(device)
-
     # Optimization
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     # Training Loop
     best_val_acc = 0.0
@@ -219,7 +248,7 @@ def main():
     start_time = time.time()
 
     # Training Loop
-    for epoch in range(args.epochs):
+    for epoch in range(epochs):
         ep_start = time.time()
 
         # Train for one epoch
@@ -233,7 +262,7 @@ def main():
         # Print epoch results
         dt = time.time() - ep_start
         print(
-            f"Epoch {epoch+1}/{args.epochs} [{dt:.1f}s] "
+            f"Epoch {epoch+1}/{epochs} [{dt:.1f}s] "
             f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} | "
             f"Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}"
         )
@@ -253,14 +282,14 @@ def main():
         # Save best model to checkpoint
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            ckpt_path = Path(args.checkpoint_dir) / f"cnn_baseline_{args.model}.pt"
+            ckpt_path = Path(checkpoint_dir) / f"{Path(args.config).stem}.pt"
             torch.save(
                 {
                     "epoch": epoch,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_acc": val_acc,
-                    "config": vars(args),
+                    "config": config,
                 },
                 ckpt_path,
             )
@@ -273,7 +302,7 @@ def main():
     )
 
     # Save logs
-    log_path = Path(args.output_dir) / f"training_log_{args.model}.csv"
+    log_path = Path(output_dir) / f"training_log_{Path(args.config).stem}.csv"
     pd.DataFrame(history).to_csv(log_path, index=False)
     print(f"Logs saved to {log_path}")
 
