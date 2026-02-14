@@ -6,8 +6,10 @@ TODO for M4: Create builder design to build a transform pipeline based on config
 import torch
 from torchvision import transforms
 from timm.data import create_transform, resolve_model_data_config
+from torch.utils.data import default_collate
+from torchvision.transforms.v2 import CutMix, MixUp, RandomChoice
 
-def get_transforms(model, model_name: str, image_size: int = 224, transforms_config: dict = None):
+def get_transforms(model, model_name: str, image_size: int = 224, transforms_config: list = None):
     """
     Returns appropriate data transformations for the given model.
 
@@ -24,7 +26,7 @@ def get_transforms(model, model_name: str, image_size: int = 224, transforms_con
 
     if transforms_config:
         # If transforms_config is provided, apply custom transformations
-        for step in transforms_config.get("steps", []):
+        for step in transforms_config:
             if step["name"] == "color_jitter":
                     brightness = step["params"].get("brightness", 0)
                     contrast = step["params"].get("contrast", 0)
@@ -47,6 +49,49 @@ def get_transforms(model, model_name: str, image_size: int = 224, transforms_con
         test_transform = transforms.Compose(transform_steps + [test_transform.transforms[-1]])
 
     return train_transform, val_transform, test_transform
+
+def get_collate_fn(transforms_config: list = None, num_classes = 26):
+    """
+    Returns a custom collate function if CutMix or MixUp is specified in transforms_config.
+
+    Args:
+        num_classes: Number of classes in the dataset
+        transforms_config: Optional dictionary to customize transformations
+    Returns:
+        A collate function or None.
+    """
+    use_cutmix = False
+    use_mixup = False
+    cutmix_alpha = 1.0
+    mixup_alpha = 1.0
+    
+    for step in transforms_config:
+        if step["name"] == "cutmix":
+            cutmix_alpha = step["params"].get("alpha", 1.0)
+            cutmix_p = step["params"].get("p", 0.5)
+            use_cutmix = True
+        elif step["name"] == "mixup":
+            mixup_alpha = step["params"].get("alpha", 1.0)
+            mixup_p = step["params"].get("p", 0.5)
+            use_mixup = True
+
+    def collate_fn(batch):
+        images, targets = default_collate(batch)
+        fn = None
+        if use_cutmix and use_mixup:
+            fn = RandomChoice([CutMix(alpha=cutmix_alpha, num_classes=num_classes),
+                                MixUp(alpha=mixup_alpha, num_classes=num_classes)], 
+                              p=[cutmix_p, mixup_p])
+        elif use_cutmix:
+            fn = CutMix(alpha=cutmix_alpha, num_classes=num_classes)
+        elif use_mixup:
+            fn = MixUp(alpha=mixup_alpha, num_classes=num_classes)
+
+        if fn is not None:
+            images, targets = fn(images, targets)
+        return images, targets
+
+    return collate_fn
 
 def get_default_transforms(model, model_name: str, image_size: int = 224):
     """
