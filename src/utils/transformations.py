@@ -57,6 +57,8 @@ def _build_transform_from_step(step: Dict[str, Any]):
       - gaussian_blur
       - random_perspective
       - random_erasing
+      - cutmix (handled in collate_fn, returns None)
+      - mixup (handled in collate_fn, returns None)
     """
     if "name" not in step:
         raise ValueError(f"Each transform step must contain 'name'. Got: {step}")
@@ -151,12 +153,16 @@ def _build_transform_from_step(step: Dict[str, Any]):
             value=value,
             inplace=inplace,
         )
+    
+    elif name == "cutmix" or name == "mixup":
+        # These are handled in collate_fn, not as part of transform pipeline
+        return None
 
     else:
         raise ValueError(
             f"Unsupported transform name: {name}. "
             f"Supported: color_jitter, random_rotation, random_horizontal_flip, "
-            f"random_resized_crop, random_affine, gaussian_blur, random_perspective, random_erasing"
+            f"random_resized_crop, random_affine, gaussian_blur, random_perspective, random_erasing, cutmix, mixup."
         )
 
 
@@ -172,8 +178,8 @@ def _inject_custom_train_transforms(train_transform, custom_steps: List[Dict[str
 
     custom_ops = [_build_transform_from_step(s) for s in custom_steps]
 
-    image_ops = [op for op in custom_ops if not isinstance(op, transforms.RandomErasing)]
-    erasing_ops = [op for op in custom_ops if isinstance(op, transforms.RandomErasing)]
+    image_ops = [op for op in custom_ops if not isinstance(op, transforms.RandomErasing) and op is not None]
+    erasing_ops = [op for op in custom_ops if isinstance(op, transforms.RandomErasing) and op is not None]
 
     if not hasattr(train_transform, "transforms"):
         return transforms.Compose(image_ops + [train_transform] + erasing_ops)
