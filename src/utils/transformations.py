@@ -1,74 +1,257 @@
 """
 This module provides data transformation pipelines for different model architectures.
-TODO for M4: Create builder design to build a transform pipeline based on configuration.
+M4: Build transform pipeline from config.
 """
 
-import torch
+from copy import deepcopy
+from typing import Any, Dict, List, Optional, Union
+
 from torchvision import transforms
 from timm.data import create_transform, resolve_model_data_config
 
-def get_transforms(model, model_name: str, image_size: int = 224, transforms_config: dict = None):
+
+# -----------------------------
+# Helpers
+# -----------------------------
+def _to_tuple2(x, name: str):
+    """
+    Convert list/tuple of length 2 to tuple(float, float).
+    """
+    if isinstance(x, (list, tuple)) and len(x) == 2:
+        return (float(x[0]), float(x[1]))
+    raise ValueError(f"{name} must be a list/tuple of length 2, got: {x}")
+
+
+def _normalize_steps(transforms_config: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]) -> List[Dict[str, Any]]:
+    """
+    Support BOTH formats:
+      A) {"steps": [ ... ]}
+      B) [ ... ]
+    """
+    if transforms_config is None:
+        return []
+
+    if isinstance(transforms_config, list):
+        return transforms_config
+
+    if isinstance(transforms_config, dict):
+        steps = transforms_config.get("steps", [])
+        if not isinstance(steps, list):
+            raise ValueError("transforms_config['steps'] must be a list.")
+        return steps
+
+    raise ValueError("transforms_config must be dict, list, or None.")
+
+
+def _build_transform_from_step(step: Dict[str, Any]):
+    """
+    Map config step -> torchvision transform instance.
+    Supported names:
+      - color_jitter
+      - random_rotation
+      - random_horizontal_flip
+      - random_resized_crop
+      - random_affine
+      - gaussian_blur
+      - random_perspective
+      - random_erasing
+    """
+    if "name" not in step:
+        raise ValueError(f"Each transform step must contain 'name'. Got: {step}")
+
+    name = step["name"]
+    params = step.get("params", {}) or {}
+
+    if name == "color_jitter":
+        return transforms.ColorJitter(
+            brightness=params.get("brightness", 0),
+            contrast=params.get("contrast", 0),
+            saturation=params.get("saturation", 0),
+            hue=params.get("hue", 0),
+        )
+
+    elif name == "random_rotation":
+        degrees = params.get("degrees", 0)
+        return transforms.RandomRotation(degrees)
+
+    elif name == "random_horizontal_flip":
+        p = float(params.get("p", 0.5))
+        return transforms.RandomHorizontalFlip(p=p)
+
+    elif name == "random_resized_crop":
+        size = params.get("size", 224)
+        scale = _to_tuple2(params.get("scale", [0.8, 1.0]), "random_resized_crop.scale")
+        ratio = _to_tuple2(params.get("ratio", [0.75, 1.3333]), "random_resized_crop.ratio")
+        interpolation = params.get("interpolation", transforms.InterpolationMode.BILINEAR)
+        antialias = params.get("antialias", True)
+        return transforms.RandomResizedCrop(
+            size=size,
+            scale=scale,
+            ratio=ratio,
+            interpolation=interpolation,
+            antialias=antialias,
+        )
+
+    elif name == "random_affine":
+        degrees = params.get("degrees", 0)
+        translate = params.get("translate", None)
+        scale = params.get("scale", None)
+        shear = params.get("shear", None)
+
+        if translate is not None:
+            translate = _to_tuple2(translate, "random_affine.translate")
+        if scale is not None:
+            scale = _to_tuple2(scale, "random_affine.scale")
+        # shear can be number or sequence in torchvision
+
+        interpolation = params.get("interpolation", transforms.InterpolationMode.BILINEAR)
+        fill = params.get("fill", 0)
+
+        return transforms.RandomAffine(
+            degrees=degrees,
+            translate=translate,
+            scale=scale,
+            shear=shear,
+            interpolation=interpolation,
+            fill=fill,
+        )
+
+    elif name == "gaussian_blur":
+        kernel_size = params.get("kernel_size", 3)
+        sigma = params.get("sigma", [0.1, 1.0])
+        if isinstance(sigma, (list, tuple)):
+            sigma = _to_tuple2(sigma, "gaussian_blur.sigma")
+        return transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
+
+    elif name == "random_perspective":
+        distortion_scale = float(params.get("distortion_scale", 0.1))
+        p = float(params.get("p", 0.3))
+        interpolation = params.get("interpolation", transforms.InterpolationMode.BILINEAR)
+        fill = params.get("fill", 0)
+        return transforms.RandomPerspective(
+            distortion_scale=distortion_scale,
+            p=p,
+            interpolation=interpolation,
+            fill=fill,
+        )
+
+    elif name == "random_erasing":
+        # NOTE: should be after ToTensor/Normalize stage.
+        p = float(params.get("p", 0.25))
+        scale = _to_tuple2(params.get("scale", [0.02, 0.1]), "random_erasing.scale")
+        ratio = _to_tuple2(params.get("ratio", [0.3, 3.3]), "random_erasing.ratio")
+        value = params.get("value", 0)
+        inplace = bool(params.get("inplace", False))
+        return transforms.RandomErasing(
+            p=p,
+            scale=scale,
+            ratio=ratio,
+            value=value,
+            inplace=inplace,
+        )
+
+    else:
+        raise ValueError(
+            f"Unsupported transform name: {name}. "
+            f"Supported: color_jitter, random_rotation, random_horizontal_flip, "
+            f"random_resized_crop, random_affine, gaussian_blur, random_perspective, random_erasing"
+        )
+
+
+def _inject_custom_train_transforms(train_transform, custom_steps: List[Dict[str, Any]]):
+    """
+    Inject custom transforms into train pipeline only.
+    - image-space transforms are inserted BEFORE tensor conversion step
+      (ToTensor / PILToTensor / MaybeToTensor)
+    - random_erasing is inserted AFTER normalization (or at end if normalize not found)
+    """
+    if not custom_steps:
+        return train_transform
+
+    custom_ops = [_build_transform_from_step(s) for s in custom_steps]
+
+    image_ops = [op for op in custom_ops if not isinstance(op, transforms.RandomErasing)]
+    erasing_ops = [op for op in custom_ops if isinstance(op, transforms.RandomErasing)]
+
+    if not hasattr(train_transform, "transforms"):
+        return transforms.Compose(image_ops + [train_transform] + erasing_ops)
+
+    base_ops = list(deepcopy(train_transform.transforms))
+
+    # Helper: match by class name to support timm wrappers like MaybeToTensor
+    def _cls_name(op):
+        return op.__class__.__name__.lower()
+
+    tensor_like_names = {"totensor", "piltotensor", "maybetotensor"}
+    normalize_names = {"normalize"}
+
+    # 1) Find tensor conversion position
+    tensor_idx = None
+    for i, op in enumerate(base_ops):
+        if _cls_name(op) in tensor_like_names:
+            tensor_idx = i
+            break
+
+    # Insert image-space ops before tensor conversion if found; else prepend
+    if tensor_idx is None:
+        ops_after_image_insert = image_ops + base_ops
+    else:
+        ops_after_image_insert = base_ops[:tensor_idx] + image_ops + base_ops[tensor_idx:]
+
+    # 2) Place RandomErasing after normalize if normalize exists, else append
+    if erasing_ops:
+        norm_idx = None
+        for i, op in enumerate(ops_after_image_insert):
+            if _cls_name(op) in normalize_names:
+                norm_idx = i
+                break
+
+        if norm_idx is None:
+            final_ops = ops_after_image_insert + erasing_ops
+        else:
+            final_ops = ops_after_image_insert[: norm_idx + 1] + erasing_ops + ops_after_image_insert[norm_idx + 1 :]
+    else:
+        final_ops = ops_after_image_insert
+
+    return transforms.Compose(final_ops)
+
+
+# -----------------------------
+# Public API
+# -----------------------------
+def get_transforms(
+    model,
+    model_name: str,
+    image_size: int = 224,
+    transforms_config: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None
+):
     """
     Returns appropriate data transformations for the given model.
 
     Args:
         model: The model object (used for ViT models to get data config)
-        model_name: Name of the model (e.g., 'mobilenet_v3_small', 'efficientnet_b0', 'vit_base_patch16_224', 'cct_14_7x2_224')
-        image_size: Target image size for resizing (default: 224)
-        transforms_config: Optional dictionary to customize transformations
+        model_name: model name
+        image_size: target image size
+        transforms_config: optional config for custom training augmentations
     Returns:
-        A tuple of (train_transform, val_transform, test_transform) suitable for the specified model.
+        (train_transform, val_transform, test_transform)
     """
-
-    transform_steps = []
-
-    if transforms_config:
-        # If transforms_config is provided, apply custom transformations
-        for step in transforms_config.get("steps", []):
-            if step["name"] == "color_jitter":
-                    brightness = step["params"].get("brightness", 0)
-                    contrast = step["params"].get("contrast", 0)
-                    saturation = step["params"].get("saturation", 0)
-                    hue = step["params"].get("hue", 0)
-                    transform_steps.append(transforms.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue))
-
-            elif step["name"] == "random_rotation":
-                degrees = step["params"].get("degrees", 0)
-                transform_steps.append(transforms.RandomRotation(degrees))
-
-            # Add more custom transformations as needed
-
     train_transform, val_transform, test_transform = get_default_transforms(model, model_name, image_size)
 
-    if transform_steps:
-        # Apply custom transforms to each transform pipeline
-        train_transform = transforms.Compose(transform_steps + [train_transform.transforms[-1]])  # Keep normalization at the end
-        val_transform = transforms.Compose(transform_steps + [val_transform.transforms[-1]])
-        test_transform = transforms.Compose(transform_steps + [test_transform.transforms[-1]])
+    custom_steps = _normalize_steps(transforms_config)
+    if custom_steps:
+        # Apply custom augmentation to TRAIN only
+        train_transform = _inject_custom_train_transforms(train_transform, custom_steps)
 
     return train_transform, val_transform, test_transform
 
+
 def get_default_transforms(model, model_name: str, image_size: int = 224):
     """
-    Returns appropriate default data transformations for the given model.
-
-    Args:
-        model: The model object (used for ViT models to get data config)
-        model_name: Name of the model (e.g., 'mobilenet_v3_small', 'efficientnet_b0', 'vit_base_patch16_224', 'cct_14_7x2_224')
-        image_size: Target image size for resizing (default: 224)   
-    Returns:
-        A tuple of (train_transform, val_transform) suitable for the specified model.
+    Returns default data transformations for the given model.
     """
 
     if model_name in ["mobilenet_v3_small", "efficientnet_b0", "cct_14_7x2_224"]:
-        # Transformations:
-        #- Training data: Includes random horizontal flips for augmentation
-        #- Validation data: Deterministic transforms only (no augmentation)
-        #- Both use ImageNet normalization to match pre-trained model expectations
-
-        # Standard ImageNet normalization statistics for RGB channels
-        # These specific mean/std values are required because the pre-trained models
-        # (MobileNet, EfficientNet) were trained on ImageNet using this distribution.
         normalize = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225],
@@ -100,7 +283,6 @@ def get_default_transforms(model, model_name: str, image_size: int = 224):
         )
 
     elif model_name in ["vit_base_patch16_224", "swin_base_patch4_window7_224", "maxvit_base_tf_224"]:
-        # Use timm's create_transform for ViT
         data_config = resolve_model_data_config(model)
 
         train_transform = create_transform(
