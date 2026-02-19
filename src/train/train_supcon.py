@@ -34,7 +34,7 @@ from src.utils.dataloaders import get_train_dataloader, get_val_dataloader
 from src.utils.baseline_models import get_model
 from src.utils.transformations import get_transforms
 
-from src.utils.supcon import SupConLoss, SupConViT, get_label_mappings, create_mask
+from src.utils.supcon import SupConLoss, SupConViT, get_label_mappings, create_mask, TwoCropTransform
 
 # Only runs if on MacOS (Darwin is the OS kernel name for MacOS)
 # Disable SSL verification to fix for MacOS SSL error when downloading models
@@ -51,6 +51,11 @@ def unfreeze_backbone(model: SupConViT):
         for block in model.backbone.blocks[-4:]:
             for param in block.parameters():
                 param.requires_grad = True
+    elif model.backbone_name == "maxvit_base_tf_224":
+        # Unfreeze last stage
+        for stage in model.backbone.stages[-1:]:
+            for param in stage.parameters():
+                param.requires_grad = True
 
     return model
 
@@ -61,6 +66,10 @@ def unfreeze_classifier(model: SupConViT):
 
     if model.backbone_name == "vit_base_patch16_224":
         # Unfreeze classifier
+        for param in model.backbone.head.parameters():
+            param.requires_grad = True
+    elif model.backbone_name == "maxvit_base_tf_224":
+        # Unfreeze last stage and the head layers
         for param in model.backbone.head.parameters():
             param.requires_grad = True
 
@@ -94,14 +103,17 @@ def train_one_epoch_embedding(model: SupConViT, loader, embed_criterion, optimiz
 
     pbar = tqdm(loader, desc="Training", leave=False)
     for images, labels in pbar:
+        images = torch.cat([images[0], images[1]], dim=0)
         images, labels = images.to(device), labels.to(device)
+        bsz = labels.shape[0]
 
         # Clear old gradients
         optimizer.zero_grad()
 
         # Forward pass (predictions)
         features, _ = model(images)
-        features = features.view(images.shape[0], 2, -1)
+        f1, f2 = torch.split(features, [bsz, bsz], dim=0)
+        features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
 
         # Compute loss
         mask = create_mask(labels, canonical_to_crop, canonical_to_disease, device)
@@ -150,6 +162,8 @@ def train_one_epoch_classifier(model: SupConViT, loader, classify_criterion, opt
 
     pbar = tqdm(loader, desc="Training", leave=False)
     for images, labels in pbar:
+        images = torch.cat([images[0], images[1]], dim=0)
+           
         images, labels = images.to(device), labels.to(device)
 
         # Clear old gradients
@@ -216,13 +230,9 @@ def validate(model: SupConViT, loader, embed_criterion, classify_criterion, devi
 
             # Forward pass (predictions)
             features, outputs = model(images)
-            features = features.view(images.shape[0], 2, -1)
 
             # Compute loss
-            mask = create_mask(labels, canonical_to_crop, canonical_to_disease, device)
-            embed_loss = embed_criterion(features, mask=mask)
-            classify_loss = classify_criterion(outputs, labels)
-            loss = embed_loss + classify_loss
+            loss = classify_criterion(outputs, labels)
 
             # Update running loss
             running_loss += loss.item() * images.size(0)
@@ -300,6 +310,8 @@ def main():
         model_name=model_name,
         image_size=224
     )
+
+    train_transform = TwoCropTransform(train_transform)
 
     # Load Data
     print(f"Loading data from {splits_dir}...")

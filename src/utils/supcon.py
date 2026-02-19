@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms as transforms
 
 import pandas as pd
 
@@ -234,11 +235,25 @@ class SupConViT(nn.Module):
 
     def forward(self, x):
         features = self.backbone.forward_features(x)  # (B, 197, 768)
-        cls_token = features[:, 0]                   # (B, 768)
+        
+        pooled = self.backbone.forward_head(features, pre_logits=True)
 
-        proj = F.normalize(cls_token, dim=1)
+        proj = F.normalize(pooled, dim=1)
 
         # Classification logits
         logits = self.backbone.forward_head(features)
 
         return proj, logits
+    
+class TwoCropTransform:
+    def __init__(self, base_transform):
+        self.transform = transforms.Compose(
+                            [transforms.RandomResizedCrop(224)] +
+                            list(base_transform.transforms)
+                        )
+
+    def __call__(self, x):
+        return [
+            self.transform(x),
+            self.transform(x)
+        ]
