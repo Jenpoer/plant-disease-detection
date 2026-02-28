@@ -56,6 +56,18 @@ def unfreeze_backbone(model: SupConViT):
         for stage in model.backbone.stages[-1:]:
             for param in stage.parameters():
                 param.requires_grad = True
+    elif model.backbone_name == "cct_14_7x2_224":
+        for name, param in model.backbone.named_parameters():
+            if any(x in name for x in ["blocks.13", "blocks.12"]):
+                param.requires_grad = True
+    elif model.backbone_name == "swin_base_patch4_window7_224":
+        # Unfreeze last two and norm layers
+        for stage in model.backbone.layers[-2:]:
+            for param in stage.parameters():
+                param.requires_grad = True
+
+        for param in model.backbone.norm.parameters():
+            param.requires_grad = True
 
     return model
 
@@ -70,6 +82,14 @@ def unfreeze_classifier(model: SupConViT):
             param.requires_grad = True
     elif model.backbone_name == "maxvit_base_tf_224":
         # Unfreeze last stage and the head layers
+        for param in model.backbone.head.parameters():
+            param.requires_grad = True
+    elif model.backbone_name == "cct_14_7x2_224":
+        for name, param in model.backbone.named_parameters():
+            if "classifier.fc" in name:
+                param.requires_grad = True
+    elif model.backbone_name == "swin_base_patch4_window7_224":
+        # Unfreeze head layer
         for param in model.backbone.head.parameters():
             param.requires_grad = True
 
@@ -163,6 +183,7 @@ def train_one_epoch_classifier(model: SupConViT, loader, classify_criterion, opt
     pbar = tqdm(loader, desc="Training", leave=False)
     for images, labels in pbar:
         images = torch.cat([images[0], images[1]], dim=0)
+        labels = labels.repeat(2)
            
         images, labels = images.to(device), labels.to(device)
 
@@ -173,10 +194,9 @@ def train_one_epoch_classifier(model: SupConViT, loader, classify_criterion, opt
 
         # Forward pass (predictions)
         features, outputs = model(images)
-        o1, o2 = torch.split(outputs, [bsz, bsz], dim=0)
 
         # Compute loss
-        loss = classify_criterion(o1, labels) + classify_criterion(o2, labels)
+        loss = classify_criterion(outputs, labels)
 
         # Backward pass (calculate gradients) and optimize
         loss.backward()
@@ -186,13 +206,11 @@ def train_one_epoch_classifier(model: SupConViT, loader, classify_criterion, opt
         running_loss += loss.item() * images.size(0)
 
         # Get predictions and update total
-        _, predicted1 = o1.max(1)
-        _, predicted2 = o2.max(1)
+        _, predicted = outputs.max(1)
         total += labels.size(0)
 
         # Count how many predictions are correct
-        correct += predicted1.eq(labels).sum().item()
-        correct += predicted2.eq(labels).sum().item()
+        correct += predicted.eq(labels).sum().item()
 
         # Update progress bar
         pbar.set_postfix(loss=loss.item(), acc=correct / total)
