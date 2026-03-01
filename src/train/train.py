@@ -253,7 +253,7 @@ def main():
 
     # Model
     print(f"Initializing {model_name}...")
-    model = get_model(model_name, num_classes=26)
+    model = get_model(model_name, num_classes=26, unfreeze_backbone=False)
     model.to(device)
 
     # Get data transforms based on model
