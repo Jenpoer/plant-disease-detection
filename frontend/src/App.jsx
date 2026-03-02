@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Header from "./components/Header";
 import ImagePanel from "./components/ImagePanel";
 import ResultPanel from "./components/ResultPanel";
@@ -11,6 +11,7 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     checkHealth()
@@ -36,12 +37,35 @@ function App() {
     }
   };
 
+  const handleClear = () => {
+    setPreviewUrl(null);
+    setResult(null);
+    setError(null);
+    setLoading(false);
+  };
+
+  const handleUploadAnother = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <div className="app">
       <Header modelVersion={modelVersion} />
       <main className="main-content">
-        <ImagePanel previewUrl={previewUrl} onFileSelect={handleFileSelect} />
-        <ResultPanel result={result} loading={loading} error={error} />
+        <ImagePanel
+          previewUrl={previewUrl}
+          onFileSelect={handleFileSelect}
+          fileInputRef={fileInputRef}
+        />
+        <ResultPanel
+          result={result}
+          loading={loading}
+          error={error}
+          onClear={handleClear}
+          onUploadAnother={handleUploadAnother}
+        />
       </main>
     </div>
   );
