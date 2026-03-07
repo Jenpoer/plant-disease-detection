@@ -1,8 +1,9 @@
 {
-    "model_name": "cct_14_7x2_224",
+    "model_name": "maxvit_base_tf_224",
     "data_dir": ".",
     "splits_dir": "data/splits",
     "checkpoint_dir": "checkpoints/baseline",
+    "unfreeze_backbone": "False",
 
     "hyperparameters": {
         "batch_size": 32,
