@@ -2,7 +2,7 @@
     "model_name": "vit_base_patch16_224",
     "data_dir": "../plant-disease-detection",
     "splits_dir": "../plant-disease-detection/data/splits",
-    "checkpoint_dir": "checkpoints/supcon",
+    "checkpoint_dir": "checkpoints/dg",
 
     "hyperparameters": {
         "batch_size": 32,
@@ -11,8 +11,5 @@
         "weight_decay": 0.05
     },
 
-    "transformations": [
-        {"name": "random_affine"},
-        {"name": "random_perspective"}
-    ]
+    "transformations": []
 }
