@@ -27,6 +27,7 @@ from tqdm import tqdm
 import json
 import random
 import numpy as np
+from peft import LoraConfig, get_peft_model
 
 # Add project root to path BEFORE importing local modules
 sys.path.append(str(Path(__file__).resolve().parents[2]))
@@ -221,6 +222,9 @@ def main():
     # Check whether or not to freeze backbone
     unfreeze_backbone = str.lower(config.get("unfreeze_backbone", "true")) == "true"
 
+    # Check if LoRA is enabled
+    lora_enabled = config["hyperparameters"].get("lora", None)
+
     # Deserialize hyperparameters
     epochs = config["hyperparameters"].get(
         "num_epochs", config["hyperparameters"].get("epochs", 10)
@@ -257,6 +261,20 @@ def main():
     # Model
     print(f"Initializing {model_name}...")
     model = get_model(model_name, num_classes=26, unfreeze_backbone=unfreeze_backbone)
+
+    if lora_enabled:
+        lora_config = LoraConfig(
+            r=lora_enabled.get("r", 8),
+            lora_alpha=lora_enabled.get("lora_alpha", 16),
+            target_modules=lora_enabled.get("target_modules", ["attn.q", "attn.v"]), # need to find away to check on the attention layer for each model to have it as target modules 
+            lora_dropout=lora_enabled.get("lora_dropout", 0.1),
+            bias="none",
+            task_type="FEATURE_EXTRACTION",
+        )
+        model = get_peft_model(model, lora_config)
+        print("LoRA adapter applied")
+
+    
     model.to(device)
 
     # Get data transforms based on model
@@ -308,7 +326,7 @@ def main():
     scheduler_name = config["hyperparameters"].get("scheduler")
     scheduler = None
     if scheduler_name == "cosine":
-        print(f"Using CosineAnnealingLR scheduler (T_max: {epochs})")
+        print(f"Using Cosine Annealing LR scheduler (T_max: {epochs})")
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     # Training Loop
