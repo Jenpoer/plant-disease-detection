@@ -122,7 +122,8 @@ def main():
     # Setup transforms
     # -----------------------
 
-    backbone = timm.create_model(args.model_name, pretrained=False)
+    timm_model_name = "mobilenetv3_small_100" if args.model_name == "mobilenet_v3_small" else args.model_name
+    backbone = timm.create_model(timm_model_name, pretrained=False)
 
     data_config = resolve_model_data_config(backbone)
 

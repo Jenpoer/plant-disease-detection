@@ -17,6 +17,10 @@ class SubspaceDGModel(nn.Module):
         self.backbone = get_model(backbone_name, num_classes=num_classes, pretrained=pretrained, unfreeze_backbone=False)
         feat_dim = self.backbone.num_features
         embed_dim = feat_dim
+
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+
         # self.adapter = nn.Linear(feat_dim, embed_dim)
         self.class_subspace = nn.Linear(embed_dim, embed_dim, bias=False)
         self.style_subspace = nn.Linear(embed_dim, embed_dim, bias=False)
@@ -25,7 +29,13 @@ class SubspaceDGModel(nn.Module):
 
     def forward(self, x):
         feat = self.backbone.forward_features(x)
-        feat = self.backbone.forward_head(feat, pre_logits=True)
+
+        if feat.ndim == 4:
+            feat = nn.functional.adaptive_avg_pool2d(feat, 1)
+            feat = feat.flatten(1)
+        else:
+            feat = self.backbone.forward_head(feat, pre_logits=True)
+
         # z = self.adapter(feat)
         z = nn.functional.normalize(feat, dim=1)
         z_class = nn.functional.normalize(self.class_subspace(z), dim=1)

@@ -186,8 +186,8 @@ class TransformerClassifier(Module):
 
         self.fc = Linear(embedding_dim, num_classes)
         self.apply(self.init_weight)
-
-    def forward(self, x):
+    
+    def pool(self, x):
         if self.positional_emb is None and x.size(1) < self.sequence_length:
             x = F.pad(x, (0, 0, 0, self.n_channels - x.size(1)), mode='constant', value=0)
 
@@ -208,7 +208,11 @@ class TransformerClassifier(Module):
             x = torch.matmul(F.softmax(self.attention_pool(x), dim=1).transpose(-1, -2), x).squeeze(-2)
         else:
             x = x[:, 0]
+        
+        return x
 
+    def forward(self, x):
+        x = self.pool(x)
         x = self.fc(x)
         return x
 

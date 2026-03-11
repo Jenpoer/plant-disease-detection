@@ -81,6 +81,17 @@ class CCT(nn.Module):
             positional_embedding=positional_embedding
         )
 
+        self.num_features = embedding_dim
+
+    def forward_features(self, x):
+        return self.tokenizer(x)
+    
+    def forward_head(self, x, pre_logits=True):
+        if pre_logits:
+            return self.classifier.pool(x)
+        else:
+            return self.classifier(x)
+
     def forward(self, x):
         x = self.tokenizer(x)
         return self.classifier(x)

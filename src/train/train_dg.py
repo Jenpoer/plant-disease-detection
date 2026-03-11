@@ -136,17 +136,19 @@ def main():
 
     # timm transforms
     model_name = config["model_name"]
-    backbone = timm.create_model(model_name, pretrained=True, num_classes=0)
-    data_config = resolve_model_data_config(backbone)
-    timm_transform = create_transform(**data_config, is_training=False)
-    img_size = data_config["input_size"][1]
+    timm_model_name = "mobilenetv3_small_100" if model_name == "mobilenet_v3_small" else model_name
+    with torch.no_grad():
+        backbone = timm.create_model(timm_model_name, pretrained=True, num_classes=0)
+        data_config = resolve_model_data_config(backbone)
+        timm_transform = create_transform(**data_config, is_training=False)
+        img_size = data_config["input_size"][1]
 
-    # Wrap dataset for SupCon
-    train_dataset = DGTwoViewWrapper(base_train_dataset, timm_transform, img_size, transform_config)
+        # Wrap dataset for SupCon
+        train_dataset = DGTwoViewWrapper(base_train_dataset, timm_transform, img_size, transform_config)
 
-    train_loader = DataLoader(train_dataset, batch_size=config["hyperparameters"].get("batch_size",32),
-                              shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
-    val_loader = get_val_dataloader(val_csv, root_dir=data_dir, batch_size=config["hyperparameters"].get("batch_size",32), transforms=timm_transform)
+        train_loader = DataLoader(train_dataset, batch_size=config["hyperparameters"].get("batch_size",32),
+                                shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+        val_loader = get_val_dataloader(val_csv, root_dir=data_dir, batch_size=config["hyperparameters"].get("batch_size",32), transforms=timm_transform)
 
     # Model
     num_classes = config.get("num_classes",26)
