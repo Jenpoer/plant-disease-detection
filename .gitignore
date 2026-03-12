@@ -1,5 +1,5 @@
 # data & outputs
-docs/tmp
+docs/tmp/
 data/
 outputs/
 checkpoints/
@@ -7,7 +7,7 @@ checkpoints/
 # archives
 results_zip/tmp_results/
 results_zip/best_model/
-docs/tmp_mocks
+docs/tmp_mocks/
 *.zip
 *.tar
 *.tar.gz
@@ -19,6 +19,12 @@ __pycache__/
 .venv/
 .venv
 .env
+
+# frontend / build caches
+frontend/.vite/
+.vite/
+node_modules/
+dist/
 
 # OS
 .DS_Store
