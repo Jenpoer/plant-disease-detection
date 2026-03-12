@@ -17,6 +17,7 @@ docs/tmp_mocks/
 __pycache__/
 *.pyc
 .venv/
+.venv
 .env
 
 # frontend / build caches
