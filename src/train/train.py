@@ -262,14 +262,20 @@ def main():
     print(f"Initializing {model_name}...")
     model = get_model(model_name, num_classes=26, unfreeze_backbone=unfreeze_backbone)
 
+    print("\nModel architecture:\n")
+
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Linear):
+            print(name)
+
     if lora_enabled:
         lora_config = LoraConfig(
             r=lora_enabled.get("r", 8),
             lora_alpha=lora_enabled.get("lora_alpha", 16),
-            target_modules=lora_enabled.get("target_modules", ["attn.q", "attn.v"]), # need to find away to check on the attention layer for each model to have it as target modules 
+            target_modules=lora_enabled.get("target_modules", ["qkv"]), # need to find away to check on the attention layer for each model to have it as target modules 
             lora_dropout=lora_enabled.get("lora_dropout", 0.1),
             bias="none",
-            task_type="FEATURE_EXTRACTION",
+            task_type=None,
         )
         model = get_peft_model(model, lora_config)
         print("LoRA adapter applied")

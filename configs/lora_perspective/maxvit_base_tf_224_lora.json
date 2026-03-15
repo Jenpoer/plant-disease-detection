@@ -1,15 +1,14 @@
 {
-    "model_name": "vit_base_patch16_224",
+    "model_name": "maxvit_base_tf_224",
     "data_dir": ".",
     "splits_dir": "data/splits",
-    "checkpoint_dir": "checkpoints/baseline_lora",
+    "checkpoint_dir": "checkpoints/lora_perspective",
     "unfreeze_backbone": "False",
 
     "hyperparameters": {
         "batch_size": 32,
         "num_epochs": 10,
         "learning_rate": 0.0001,
-        "weight_decay": 0.05,
         "lora": {
             "r": 8,
             "lora_alpha": 16,

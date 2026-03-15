@@ -30,7 +30,7 @@ from tqdm import tqdm
 
 # Add project root to path BEFORE importing local modules
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-
+from peft import LoraConfig, get_peft_model
 # Load helpers for data and model loading
 from src.utils.transformations import get_transforms
 from src.utils.dataloaders import get_test_dataloader
@@ -96,6 +96,12 @@ def main():
     parser.add_argument("--data-dir", type=str, default=".")
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument(
+        "--lora",
+        nargs="*",
+        default=None,
+        help="Enable LoRA for evaluation and specify target modules (e.g., --lora attn.q attn.v). If not set, LoRA is not used."
+    )
+    parser.add_argument(
         "--output-file", type=str, default="outputs/evaluation_results.csv"
     )
 
@@ -113,6 +119,28 @@ def main():
     # Load Model
     print(f"Loading model from {args.model_path}...")
     model = get_model(args.model_name, num_classes=26, pretrained=False)
+
+    lora_config_dict = None
+    if args.lora:  # If user passed --lora with layers
+            lora_config_dict = {
+                "r": 8,
+                "lora_alpha": 16,
+                "target_modules": args.lora,
+                "lora_dropout": 0.1
+            }
+    
+    if lora_config_dict:
+            lora_config = LoraConfig(
+                r=lora_config_dict.get("r", 8),
+                lora_alpha=lora_config_dict.get("lora_alpha", 16),
+                target_modules=lora_config_dict.get("target_modules", ["attn.q", "attn.v"]),
+                lora_dropout=lora_config_dict.get("lora_dropout", 0.1),
+                bias="none",
+                task_type=None,
+            )
+            model = get_peft_model(model, lora_config)
+            print(f"LoRA adapter applied for evaluation with target modules: {lora_config.target_modules}")
+
     checkpoint = torch.load(args.model_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
@@ -147,6 +175,10 @@ def main():
 
         # Calculate metrics
         acc = accuracy_score(y_true, y_pred)
+
+        precision_macro = precision_score(y_true, y_pred, average="macro", zero_division=0)
+        recall_macro = recall_score(y_true, y_pred, average="macro", zero_division=0)
+
         precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
         recall = recall_score(y_true, y_pred, average="weighted", zero_division=0)
 
@@ -175,6 +207,8 @@ def main():
         print(f"  F1 (Macro):  {f1_macro:.4f}")
         print(f"  F1 (Micro):  {f1_micro:.4f}")
         print(f"  F1 (Weighted):   {f1_weighted:.4f}")
+        print(f"  Precision (Macro): {precision_macro:.4f}")
+        print(f"  Recall (Macro):    {recall_macro:.4f}")
 
         results.append(
             {

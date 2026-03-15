@@ -2,7 +2,7 @@
     "model_name": "vit_base_patch16_224",
     "data_dir": ".",
     "splits_dir": "data/splits",
-    "checkpoint_dir": "checkpoints/baseline_lora",
+    "checkpoint_dir": "checkpoints/lora_perspective",
     "unfreeze_backbone": "False",
 
     "hyperparameters": {
