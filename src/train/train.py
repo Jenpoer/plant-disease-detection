@@ -205,6 +205,7 @@ def main():
         "--num_workers", type=int, default=4, help="Number of DataLoader workers"
     )
     parser.add_argument("--debug", action="store_true", help="Run with small subset")
+    parser.add_argument("--plantdoc", action="store_true", help="Train with PlantDoc")
 
     args = parser.parse_args()
 
@@ -249,8 +250,12 @@ def main():
     print(f"Using device: {device}")
 
     # Data Paths
-    train_csv = Path(splits_dir) / "pv_train.csv"
-    val_csv = Path(splits_dir) / "pv_val.csv"
+    if args.plantdoc:
+        train_csv = Path(splits_dir) / "pd_train.csv"
+        val_csv = Path(splits_dir) / "pd_val.csv"
+    else:
+        train_csv = Path(splits_dir) / "pv_train.csv"
+        val_csv = Path(splits_dir) / "pv_val.csv"
 
     # Check if split partitions exist
     if not train_csv.exists() or not val_csv.exists():
