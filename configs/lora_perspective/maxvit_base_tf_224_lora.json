@@ -1,0 +1,26 @@
+{
+    "model_name": "maxvit_base_tf_224",
+    "data_dir": ".",
+    "splits_dir": "data/splits",
+    "checkpoint_dir": "checkpoints/lora_perspective",
+    "unfreeze_backbone": "False",
+
+    "hyperparameters": {
+        "batch_size": 32,
+        "num_epochs": 10,
+        "learning_rate": 0.0001,
+        "lora": {
+            "r": 8,
+            "lora_alpha": 16,
+            "lora_dropout": 0.1,
+            "target_modules": ["qkv"],
+            "task_type": null
+        }
+    },
+
+    "transformations": {
+      "steps": [
+        { "name": "random_perspective", "params": { "distortion_scale": 0.2, "p": 0.3, "fill": 0} }
+      ]
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "model_name": "efficientnet_b0",
+    "data_dir": ".",
+    "splits_dir": "data/splits",
+    "checkpoint_dir": "checkpoints/baseline_lora",
+    "unfreeze_backbone": "False",
+
+    "hyperparameters": {
+        "batch_size": 32,
+        "num_epochs": 10,
+        "learning_rate": 0.001,
+        "lora": {
+            "r": 8,
+            "lora_alpha": 16,
+            "lora_dropout": 0.1,
+            "target_modules": ["qkv"],
+            "task_type": null
+        }
+    },
+
+    "transformations": []
+}

@@ -27,6 +27,7 @@ from tqdm import tqdm
 import json
 import random
 import numpy as np
+from peft import LoraConfig, get_peft_model
 
 # Add project root to path BEFORE importing local modules
 sys.path.append(str(Path(__file__).resolve().parents[2]))
@@ -204,6 +205,7 @@ def main():
         "--num_workers", type=int, default=4, help="Number of DataLoader workers"
     )
     parser.add_argument("--debug", action="store_true", help="Run with small subset")
+    parser.add_argument("--plantdoc", action="store_true", help="Train with PlantDoc")
 
     args = parser.parse_args()
 
@@ -220,6 +222,9 @@ def main():
 
     # Check whether or not to freeze backbone
     unfreeze_backbone = str.lower(config.get("unfreeze_backbone", "true")) == "true"
+
+    # Check if LoRA is enabled
+    lora_enabled = config["hyperparameters"].get("lora", None)
 
     # Deserialize hyperparameters
     epochs = config["hyperparameters"].get(
@@ -245,8 +250,12 @@ def main():
     print(f"Using device: {device}")
 
     # Data Paths
-    train_csv = Path(splits_dir) / "pv_train.csv"
-    val_csv = Path(splits_dir) / "pv_val.csv"
+    if args.plantdoc:
+        train_csv = Path(splits_dir) / "pd_train.csv"
+        val_csv = Path(splits_dir) / "pd_val.csv"
+    else:
+        train_csv = Path(splits_dir) / "pv_train.csv"
+        val_csv = Path(splits_dir) / "pv_val.csv"
 
     # Check if split partitions exist
     if not train_csv.exists() or not val_csv.exists():
@@ -257,6 +266,26 @@ def main():
     # Model
     print(f"Initializing {model_name}...")
     model = get_model(model_name, num_classes=26, unfreeze_backbone=unfreeze_backbone)
+
+    print("\nModel architecture:\n")
+
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Linear):
+            print(name)
+
+    if lora_enabled:
+        lora_config = LoraConfig(
+            r=lora_enabled.get("r", 8),
+            lora_alpha=lora_enabled.get("lora_alpha", 16),
+            target_modules=lora_enabled.get("target_modules", ["qkv"]), # possible layer to freeze: "qkv", "fc1", "fc2", "proj"
+            lora_dropout=lora_enabled.get("lora_dropout", 0.1),
+            bias="none",
+            task_type=None,
+        )
+        model = get_peft_model(model, lora_config)
+        print("LoRA adapter applied")
+
+    
     model.to(device)
 
     # Get data transforms based on model
@@ -308,7 +337,7 @@ def main():
     scheduler_name = config["hyperparameters"].get("scheduler")
     scheduler = None
     if scheduler_name == "cosine":
-        print(f"Using CosineAnnealingLR scheduler (T_max: {epochs})")
+        print(f"Using Cosine Annealing LR scheduler (T_max: {epochs})")
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     # Training Loop

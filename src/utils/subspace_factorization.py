@@ -31,7 +31,7 @@ class SubspaceDGModel(nn.Module):
     def forward(self, x):
         feat = self.backbone.forward_features(x)
 
-        if self.backbone_name in ["efficientnet_b0", "mobilenet_v3_small"]:
+        if self.backbone_name in ["efficientnet_b0", "mobilenet_v3_small", "maxvit_base_tf_224"]:
             feat = nn.functional.adaptive_avg_pool2d(feat, 1)
             feat = feat.flatten(1)
         else:

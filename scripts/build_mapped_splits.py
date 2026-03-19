@@ -7,7 +7,7 @@ PV_TRAIN = 0.80
 PV_VAL   = 0.10
 PV_TEST  = 0.10
 
-def stratified_split(df: pd.DataFrame, label_col: str, seed: int):
+def stratified_split(df: pd.DataFrame, label_col: str, seed: int, train_split=PV_TRAIN, val_split=PV_VAL):
     """
     Split df into train/val/test stratified by label_col without sklearn dependency.
     Works by sampling within each class.
@@ -18,8 +18,8 @@ def stratified_split(df: pd.DataFrame, label_col: str, seed: int):
     parts = []
     for lab, g in df.groupby(label_col, sort=False):
         n = len(g)
-        n_train = int(round(n * PV_TRAIN))
-        n_val   = int(round(n * PV_VAL))
+        n_train = int(round(n * train_split))
+        n_val   = int(round(n * val_split))
         # ensure sum doesn't exceed n
         n_train = min(n_train, n)
         n_val   = min(n_val, n - n_train)
@@ -79,10 +79,16 @@ def main():
     # PV: make stratified train/val/test
     pv_split = stratified_split(pv_mapped, label_col="canonical_id", seed=SEED)
 
+    # PlantDoc: make stratified split
+    pd_split = stratified_split(pd_train_mapped, label_col="canonical_id", seed=SEED, train_split=0.9, val_split=0.1)
+
     # Write outputs
     canonical_space.to_csv(data_splits / "label_space.csv", index=False)
     pv_mapped.to_csv(data_splits / "plantvillage_mapped.csv", index=False)
     pd_test_mapped.to_csv(data_splits / "plantdoc_test_mapped.csv", index=False)
+
+    pd_split[pd_split["split_final"] == "train"].to_csv(data_splits / "pd_train.csv", index=False)
+    pd_split[pd_split["split_final"] == "val"].to_csv(data_splits / "pd_val.csv", index=False)
 
     pv_split[pv_split["split_final"] == "train"].to_csv(data_splits / "pv_train.csv", index=False)
     pv_split[pv_split["split_final"] == "val"].to_csv(data_splits / "pv_val.csv", index=False)
@@ -104,7 +110,15 @@ def main():
     assert train_paths.isdisjoint(test_paths)
     assert val_paths.isdisjoint(test_paths)
     print("No PV leakage across splits ✓")
+
     # 4) PD only contains known canonical ids
+    for s in ["train", "val"]:
+        sub = pd_split[pd_split["split_final"] == s]
+        print(f"PD {s}: n={len(sub)} classes={sub['canonical_id'].nunique()}")
+    
+    train_paths = set(pd_split[pd_split["split_final"] == "train"]["filepath_rel"])
+    val_paths   = set(pd_split[pd_split["split_final"] == "val"]["filepath_rel"])
+    assert train_paths.isdisjoint(val_paths)
     assert pd_test_mapped["canonical_id"].notna().all()
     print("PD test fully mapped ✓")
 
