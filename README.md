@@ -52,7 +52,7 @@ The system has two complementary layers:
 
 Across all 164 runs, 91% achieved Macro F1 ≥ 0.97 on PlantVillage. This near-total saturation means PlantVillage cannot discriminate between a good and a mediocre model for real-world use. All meaningful comparisons use PlantDoc performance.
 
-**PlantDoc reveals the deployment reality.**
+**PlantDoc is the more realistic deployment benchmark.**
 
 On the field-condition test set, Macro F1 ranges from 0.08 to 0.45 across all runs — a 5× spread. The choice of architecture and training strategy matters enormously in practice, even when PlantVillage scores are nearly identical.
 
@@ -353,13 +353,13 @@ Other components of the project were developed collaboratively across the team.
 
 ## Design and Delivery Highlights
 
-**Applied AI problem framing** — The project correctly identifies that high training-set accuracy is not a deployment success metric, and structures the entire evaluation around a more informative proxy.
+**Real-world problem framing** — The project treats lab-to-field failure as the central deployment issue, rather than assuming high benchmark accuracy is enough.
 
-**Evaluation rigor** — A held-out cross-domain test set, Macro F1 as the decision metric, 164 runs across 6 architectures and 13 strategies, and a formal report documenting methodology and findings.
+**Evaluation discipline** — A held-out cross-domain test set, Macro F1 as the main decision metric, and 164 experiment runs make the findings more meaningful than a benchmark table alone.
 
-**Stakeholder-facing system thinking** — The inference prototype is designed around what a field user actually needs: not a single confident answer, but a ranked shortlist with honest uncertainty communication and clear guidance on when to trust the result.
+**Decision-support thinking** — The prototype is designed to return a shortlist with clear confidence guidance, so the model supports human judgment rather than pretending to replace it.
 
-**End-to-end execution** — The project spans data preparation, model training, systematic evaluation, a production-style inference API, a React frontend, and formal documentation — not just model training in isolation.
+**End-to-end applied AI execution** — The repo spans data preparation, model training, systematic evaluation, a local inference API, a React frontend, and formal documentation.
 
 ---
 
