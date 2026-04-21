@@ -333,25 +333,13 @@ These are stated directly because they shape how the system should and should no
 
 ---
 
-## Team Context
+## Team
 
 This was a collaborative team project spanning cross-domain benchmarking, model evaluation, and a local decision-support MVP.
 
-## My Contributions
-
-My primary contributions covered both the evaluation workflow and the deployment-facing simulator:
-
-- Implemented the **label mapping / data harmonization workflow** used to align PlantVillage and PlantDoc classes prior to training  
-- Contributed to **model training and evaluation**, running selected experiments and supporting the comparative benchmarking workflow across model and augmentation strategies  
-- Built the **React frontend** for image upload, prediction display, confidence-band communication, and user guidance  
-- Built the **FastAPI backend** for local model inference and API integration  
-- Initiated and finalized the project’s **LaTeX report**, consolidating the team’s contributions into a structured write-up of the methodology, results, and system design  
-
-Other components of the project were developed collaboratively across the team.
-
 ---
 
-## Design and Delivery Highlights
+## What This Project Demonstrates
 
 **Real-world problem framing** — The project treats lab-to-field failure as the central deployment issue, rather than assuming high benchmark accuracy is enough.
 
